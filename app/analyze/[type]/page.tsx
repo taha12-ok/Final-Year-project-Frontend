@@ -1,38 +1,46 @@
 "use client";
-import { useState, useRef, type DragEvent } from "react";
-import { motion, AnimatePresence } from "framer-motion";
+import { useState, useRef, cloneElement, isValidElement, type ReactNode } from "react";
+import { motion, AnimatePresence, type Variants } from "framer-motion";
 import Link from "next/link";
 import { useParams, useRouter } from "next/navigation";
-import { ChevronDown, Camera, Upload, FlaskConical, UploadCloud, ArrowLeft } from "lucide-react";
+import {
+  ChevronDown, Camera, Upload, FlaskConical, FileText, ScanEye,
+  Bone, Brain, Droplets, Search, Check, AlertTriangle, CheckCircle2,
+  Phone, RefreshCw, X, FolderOpen, ArrowRight,
+} from "lucide-react";
+import Navbar from "@/components/Navbar";
 import ScanAnimation from "@/components/ScanAnimation";
 import AnimatedCounter from "@/components/AnimatedCounter";
-import GradientOrb from "@/components/GradientOrb";
-import ParticlesBackground from "@/components/ParticlesBackground";
+import Field from "@/components/Field";
+import UploadZone from "@/components/UploadZone";
+import { EASE } from "@/components/Reveal";
 
-const SCAN_TYPES: Record<string, { label: string; scan: string; emoji: string; testImage: string }> = {
-  fracture: { label: "Fracture Detection", scan: "X-ray",        emoji: "🦴", testImage: "/test-fracture.png" },
-  brain:    { label: "Brain Tumor",        scan: "Brain MRI",    emoji: "🧠", testImage: "/test-brain.png"    },
-  kidney:   { label: "Kidney Disease",     scan: "CT Scan",      emoji: "🫘", testImage: "/test-kidney.png"   },
+const SCAN_TYPES: Record<string, { label: string; scan: string; icon: ReactNode; testImage: string; accent: string; soft: string }> = {
+  fracture: { label: "Fracture Detection", scan: "X-ray",     icon: <Bone size={18} />,     testImage: "/test-fracture.png", accent: "var(--violet)", soft: "var(--violet-soft)" },
+  brain:    { label: "Brain Tumor",        scan: "Brain MRI", icon: <Brain size={18} />,    testImage: "/test-brain.png",    accent: "var(--brand)",  soft: "var(--brand-soft)" },
+  kidney:   { label: "Kidney Disease",     scan: "CT Scan",   icon: <Droplets size={18} />, testImage: "/test-kidney.png",   accent: "var(--teal)",   soft: "var(--teal-soft)" },
 };
 
 const normalResults = ["normal", "not fractured", "no tumor", "benign"];
 
+/* Staggered result reveal — the most important moment in the app. */
+const resultContainer: Variants = {
+  hidden: {},
+  show: { transition: { staggerChildren: 0.12, delayChildren: 0.05 } },
+};
+const resultItem: Variants = {
+  hidden: { opacity: 0, y: 22, scale: 0.99 },
+  show: { opacity: 1, y: 0, scale: 1, transition: { duration: 0.45, ease: EASE } },
+};
+
 // ── Backend URL from environment variable ──
 const BACKEND_URL = process.env.NEXT_PUBLIC_BACKEND_URL || "http://127.0.0.1:8000";
 
-// Shared dark-theme input style
-const inputStyle: React.CSSProperties = {
-  width: "100%",
-  background: "rgba(255,255,255,0.04)",
-  border: "1px solid rgba(47,143,255,0.18)",
-  color: "var(--text-primary)",
-};
-
 export default function AnalyzePage() {
-  const params    = useParams();
-  const router    = useRouter();
-  const type      = params.type as string;
-  const scanInfo  = SCAN_TYPES[type] || SCAN_TYPES.fracture;
+  const params   = useParams();
+  const router   = useRouter();
+  const type     = params.type as string;
+  const scanInfo = SCAN_TYPES[type] || SCAN_TYPES.fracture;
 
   const fileInputRef   = useRef<HTMLInputElement>(null);
   const cameraInputRef = useRef<HTMLInputElement>(null);
@@ -45,7 +53,6 @@ export default function AnalyzePage() {
   const [pdfLoading,   setPdfLoading]   = useState(false);
   const [dropdownOpen, setDropdownOpen] = useState(false);
   const [patient,      setPatient]      = useState({ name: "", age: "", gender: "", phone: "" });
-  const [dragActive,   setDragActive]   = useState(false);
 
   // ── File set karo ──
   const applyFile = (file: File, source: "upload" | "camera") => {
@@ -105,13 +112,6 @@ export default function AnalyzePage() {
     setPdfLoading(false);
   };
 
-  const handleDrop = (e: DragEvent) => {
-    e.preventDefault();
-    setDragActive(false);
-    const f = e.dataTransfer.files?.[0];
-    if (f) applyFile(f, "upload");
-  };
-
   const switchModel = (key: string) => {
     setDropdownOpen(false);
     setImage(null);
@@ -124,331 +124,310 @@ export default function AnalyzePage() {
   const isNormal = normalResults.includes(result?.result?.toLowerCase());
 
   const sourceBadge = {
-    test:   { label: "🧪 Test Image",    color: "var(--indigo)" },
-    upload: { label: "📁 Uploaded",      color: "var(--red-light)" },
-    camera: { label: "📷 Camera",        color: "var(--cyan)" },
-    none:   { label: "",                 color: "transparent" },
+    test:   { icon: <FlaskConical size={12} />, label: "Test Image", color: "var(--violet)" },
+    upload: { icon: <FolderOpen size={12} />,   label: "Uploaded",   color: "var(--brand)" },
+    camera: { icon: <Camera size={12} />,       label: "Camera",     color: "var(--teal)" },
+    none:   { icon: null,                       label: "",           color: "transparent" },
   };
 
+  const sourceOptions = [
+    { key: "test",   icon: <FlaskConical size={19} />, label: "Test Image", sub: "Sample scan",  onClick: useTestImage,                          accent: "var(--violet)" },
+    { key: "upload", icon: <Upload size={19} />,       label: "Gallery",    sub: "From device",  onClick: () => fileInputRef.current?.click(),   accent: "var(--brand)" },
+    { key: "camera", icon: <Camera size={19} />,       label: "Camera",     sub: "Take photo",   onClick: () => cameraInputRef.current?.click(), accent: "var(--teal)" },
+  ];
+
   return (
-    <main className="hero-bg bg-grid" style={{ minHeight: '100vh', position: "relative", overflow: "hidden" }}>
-      <ParticlesBackground />
-      <GradientOrb color="rgba(47,143,255,0.30)" size={420} top="-8%" left="0%" duration={11} />
-      <GradientOrb color="rgba(34,201,166,0.24)" size={340} bottom="0%" right="5%" duration={9} delay={2} />
+    <main style={{ minHeight: "100vh", position: "relative", overflow: "clip", background: "var(--bg)" }}>
+      {/* Ambient background */}
+      <div className="mesh-bg" />
+      <div className="orb orb-drift" style={{ width: 420, height: 420, top: "-10%", left: "-6%", background: "rgba(43,75,223,0.12)" }} />
+      <div className="orb orb-drift-alt" style={{ width: 360, height: 360, bottom: "-8%", right: "-4%", background: "rgba(124,92,252,0.1)" }} />
 
-      {/* ── Navbar (glass pill, same as homepage) ── */}
-      <div className="fixed top-0 left-0 right-0 z-50" style={{ display: "flex", justifyContent: "center", padding: "20px 16px" }}>
-        <nav className="navbar-pill navbar-pill-scrolled" style={{ width: "100%", maxWidth: 1140, display: "flex", justifyContent: "space-between", alignItems: "center", padding: "10px 14px 10px 20px" }}>
-          <Link href="/" style={{ color: 'var(--gold-light)', display: "flex", alignItems: "center", gap: 8, fontWeight: 700, fontSize: 16, textDecoration: "none" }}>
-            <ArrowLeft size={18} /> MedAI
-          </Link>
-
-          {/* Model Dropdown */}
+      {/* Navbar with model switcher dropdown */}
+      <Navbar
+        variant="app"
+        right={
           <div style={{ position: "relative" }}>
-            <motion.button onClick={() => setDropdownOpen(p => !p)}
-              whileHover={{ scale: 1.03 }} whileTap={{ scale: 0.97 }}
-              style={{
-                display: "flex", alignItems: "center", gap: 8,
-                background: "rgba(47,143,255,0.08)", border: "1px solid rgba(47,143,255,0.25)",
-                borderRadius: 12, padding: "8px 16px", cursor: "pointer", color: "var(--gold-light)"
-              }}>
-              <span>{scanInfo.emoji}</span>
-              <span style={{ fontWeight: 700, fontSize: 14 }}>{scanInfo.label}</span>
-              <ChevronDown size={16} color="var(--gold-light)"
-                style={{ transform: dropdownOpen ? "rotate(180deg)" : "rotate(0deg)", transition: "0.2s" }} />
-            </motion.button>
-
+            <button onClick={() => setDropdownOpen((p) => !p)} className="btn btn-secondary"
+              style={{ padding: "9px 16px", fontSize: 13.5 }}>
+              <span style={{ display: "inline-flex" }}>{scanInfo.icon}</span> {scanInfo.label}
+              <ChevronDown size={15} style={{ transform: dropdownOpen ? "rotate(180deg)" : "none", transition: "transform 0.25s var(--ease)" }} />
+            </button>
             <AnimatePresence>
               {dropdownOpen && (
-                <motion.div
-                  initial={{ opacity: 0, y: -8, scale: 0.95 }}
-                  animate={{ opacity: 1, y: 0, scale: 1 }}
-                  exit={{ opacity: 0, y: -8, scale: 0.95 }}
-                  className="glass-surface"
-                  style={{
-                    position: "absolute", top: "calc(100% + 8px)", right: 0,
-                    borderRadius: 14, overflow: "hidden", minWidth: 230, zIndex: 100,
-                  }}>
-                  <div style={{ padding: "8px 16px 6px", borderBottom: "1px solid rgba(47,143,255,0.14)" }}>
-                    <p style={{ color: "var(--text-muted)", fontSize: 11, fontWeight: 600, letterSpacing: 1 }}>SWITCH MODEL</p>
-                  </div>
+                <motion.div initial={{ opacity: 0, y: -8, scale: 0.96 }} animate={{ opacity: 1, y: 0, scale: 1 }}
+                  exit={{ opacity: 0, y: -8, scale: 0.96 }} transition={{ duration: 0.25, ease: EASE }}
+                  className="panel" style={{ position: "absolute", top: "calc(100% + 10px)", right: 0, minWidth: 250, overflow: "hidden", zIndex: 100, boxShadow: "var(--shadow-lg)" }}>
+                  <p style={{ padding: "10px 16px 8px", borderBottom: "1px solid var(--border)", fontSize: 10.5, fontWeight: 700, letterSpacing: "0.14em", color: "var(--muted)" }}>SWITCH MODEL</p>
                   {Object.entries(SCAN_TYPES).map(([key, val]) => (
                     <button key={key} onClick={() => switchModel(key)}
                       style={{
-                        display: "flex", alignItems: "center", gap: 10,
-                        width: "100%", padding: "11px 16px",
-                        background: key === type ? "rgba(47,143,255,0.12)" : "none",
-                        border: "none", cursor: "pointer",
-                        color: key === type ? "var(--gold-light)" : "var(--text-secondary)", fontSize: 13,
-                        fontWeight: key === type ? 700 : 400,
-                        borderLeft: key === type ? "3px solid var(--gold)" : "3px solid transparent",
+                        display: "flex", alignItems: "center", gap: 10, width: "100%", padding: "11px 16px",
+                        background: key === type ? "var(--brand-soft)" : "none", border: "none", cursor: "pointer",
+                        borderLeft: key === type ? "3px solid var(--brand)" : "3px solid transparent",
+                        textAlign: "left",
                       }}>
-                      <span style={{ fontSize: 18 }}>{val.emoji}</span>
-                      <div style={{ textAlign: "left" }}>
-                        <p style={{ margin: 0 }}>{val.label}</p>
-                        <p style={{ margin: 0, fontSize: 11, color: "var(--text-muted)" }}>{val.scan}</p>
-                      </div>
-                      {key === type && <span style={{ marginLeft: "auto", fontSize: 11 }}>✓</span>}
+                      <span style={{ display: "inline-flex", color: val.accent }}>{val.icon}</span>
+                      <span>
+                        <p style={{ fontSize: 13, fontWeight: key === type ? 700 : 500, color: key === type ? "var(--brand-deep)" : "var(--ink)" }}>{val.label}</p>
+                        <p style={{ fontSize: 11, color: "var(--muted)" }}>{val.scan}</p>
+                      </span>
+                      {key === type && <span style={{ marginLeft: "auto", color: "var(--brand)", display: "inline-flex" }}><Check size={14} strokeWidth={3} /></span>}
                     </button>
                   ))}
                 </motion.div>
               )}
             </AnimatePresence>
           </div>
-        </nav>
-      </div>
+        }
+      />
 
-      {/* ── Page Header ── */}
-      <motion.div initial={{ opacity: 0, y: 20 }} animate={{ opacity: 1, y: 0 }}
-        className="text-center px-8"
-        style={{ paddingTop: 150, paddingBottom: 48, position: "relative", zIndex: 1 }}>
-        <p className="text-6xl mb-4">{scanInfo.emoji}</p>
-        <h1 className="text-4xl font-black mb-2">
-          <span className="gold-text">{scanInfo.label}</span>
+      {/* ── Page header ── */}
+      <motion.div initial={{ opacity: 0, y: 24 }} animate={{ opacity: 1, y: 0 }} transition={{ duration: 0.7, ease: EASE }}
+        style={{ textAlign: "center", padding: "140px 24px 44px", position: "relative", zIndex: 1 }}>
+        <motion.span
+          animate={{ y: [0, -6, 0] }} transition={{ duration: 4.5, repeat: Infinity, ease: "easeInOut" }}
+          style={{ display: "inline-flex", justifyContent: "center", color: scanInfo.accent }}>
+          {isValidElement(scanInfo.icon) ? cloneElement(scanInfo.icon as any, { size: 52 }) : scanInfo.icon}
+        </motion.span>
+        <h1 style={{ fontFamily: "var(--font-display)", fontSize: "clamp(32px, 4.4vw, 48px)", fontWeight: 700, letterSpacing: "-0.03em", marginTop: 8 }}>
+          <span className="gradient-text">{scanInfo.label}</span>
         </h1>
-        <p style={{ color: "var(--text-secondary)" }}>Upload a {scanInfo.scan} image for AI analysis</p>
+        <p style={{ color: "var(--muted)", fontSize: 15.5, marginTop: 8 }}>Upload a {scanInfo.scan} image for AI-assisted screening</p>
       </motion.div>
 
-      {/* ── Main Grid ── */}
-      <div className="max-w-5xl mx-auto px-6 pb-20 grid grid-cols-1 md:grid-cols-2 gap-6" style={{ position: "relative", zIndex: 1 }}>
+      {/* ── Main grid ── */}
+      <div style={{ maxWidth: 1120, margin: "0 auto", padding: "0 24px 90px", display: "grid", gridTemplateColumns: "1fr 1fr", gap: 24, position: "relative", zIndex: 1 }} className="split-grid">
 
-        {/* LEFT */}
-        <motion.div initial={{ opacity: 0, x: -20 }} animate={{ opacity: 1, x: 0 }}
-          className="rounded-2xl p-6 card">
+        {/* ═══ LEFT — inputs ═══ */}
+        <motion.div initial={{ opacity: 0, x: -26 }} animate={{ opacity: 1, x: 0 }} transition={{ duration: 0.7, delay: 0.1, ease: EASE }}
+          className="panel" style={{ padding: "28px 26px" }}>
 
-          {/* Patient Details */}
-          <h2 className="gold-text text-xl font-bold mb-4">👤 Patient Details</h2>
-          <div className="space-y-3 mb-6">
-            {[
-              { label: "Full Name", key: "name",  type: "text",   placeholder: "Enter patient name" },
-              { label: "Age",       key: "age",   type: "number", placeholder: "Enter age" },
-              { label: "Phone",     key: "phone", type: "text",   placeholder: "Enter phone number" },
-            ].map((f) => (
-              <div key={f.key}>
-                <label style={{ color: "var(--text-secondary)" }} className="text-sm">{f.label}</label>
-                <input type={f.type} placeholder={f.placeholder}
-                  value={(patient as any)[f.key]}
-                  onChange={(e) => setPatient({ ...patient, [f.key]: e.target.value })}
-                  style={inputStyle}
-                  className="w-full mt-1 rounded-xl px-4 py-3 outline-none" />
-              </div>
-            ))}
-            <div>
-              <label style={{ color: "var(--text-secondary)" }} className="text-sm">Gender</label>
-              <select value={patient.gender} onChange={(e) => setPatient({ ...patient, gender: e.target.value })}
-                style={inputStyle}
-                className="w-full mt-1 rounded-xl px-4 py-3 outline-none">
-                <option value="" style={{ background: "var(--dark2)" }}>Select gender</option>
-                <option value="Male" style={{ background: "var(--dark2)" }}>Male</option>
-                <option value="Female" style={{ background: "var(--dark2)" }}>Female</option>
-                <option value="Other" style={{ background: "var(--dark2)" }}>Other</option>
-              </select>
+          <p className="eyebrow" style={{ marginBottom: 16 }}>Step 1 · Patient</p>
+          <div style={{ display: "flex", flexDirection: "column", gap: 12, marginBottom: 26 }}>
+            <Field label="Full name" value={patient.name} onChange={(v) => setPatient({ ...patient, name: v })} required />
+            <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: 12 }}>
+              <Field label="Age" type="number" value={patient.age} onChange={(v) => setPatient({ ...patient, age: v })} required />
+              <Field label="Gender" value={patient.gender} onChange={(v) => setPatient({ ...patient, gender: v })}
+                options={[{ value: "", label: "Please select" }, { value: "Male", label: "Male" }, { value: "Female", label: "Female" }, { value: "Other", label: "Other" }]} required />
             </div>
+            <Field label="Phone (optional)" type="tel" value={patient.phone} onChange={(v) => setPatient({ ...patient, phone: v })} />
           </div>
 
-          {/* Image Source — 3 Options */}
-          <h2 className="gold-text text-xl font-bold mb-3">🩻 Select Image</h2>
-          <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr 1fr", gap: 8, marginBottom: 16 }}>
-
-            {/* Testing Image */}
-            <motion.button whileHover={{ scale: 1.03 }} whileTap={{ scale: 0.97 }}
-              onClick={useTestImage}
-              style={{
-                padding: "12px 8px", borderRadius: 12, border: "1px solid",
-                borderColor: imageSource === "test" ? "var(--gold)" : "rgba(47,143,255,0.18)",
-                background: imageSource === "test" ? "rgba(47,143,255,0.12)" : "rgba(255,255,255,0.03)",
-                color: imageSource === "test" ? "var(--indigo)" : "var(--text-secondary)",
-                cursor: "pointer", textAlign: "center"
-              }}>
-              <FlaskConical size={20} style={{ margin: "0 auto 4px" }} />
-              <p style={{ fontSize: 11, fontWeight: 600 }}>Test Image</p>
-              <p style={{ fontSize: 10, color: "var(--text-muted)", marginTop: 2 }}>Sample scan</p>
-            </motion.button>
-
-            {/* Upload from Gallery */}
-            <motion.button whileHover={{ scale: 1.03 }} whileTap={{ scale: 0.97 }}
-              onClick={() => fileInputRef.current?.click()}
-              style={{
-                padding: "12px 8px", borderRadius: 12, border: "1px solid",
-                borderColor: imageSource === "upload" ? "var(--red)" : "rgba(47,143,255,0.18)",
-                background: imageSource === "upload" ? "rgba(34,201,166,0.14)" : "rgba(255,255,255,0.03)",
-                color: imageSource === "upload" ? "var(--red-light)" : "var(--text-secondary)",
-                cursor: "pointer", textAlign: "center"
-              }}>
-              <Upload size={20} style={{ margin: "0 auto 4px" }} />
-              <p style={{ fontSize: 11, fontWeight: 600 }}>Gallery</p>
-              <p style={{ fontSize: 10, color: "var(--text-muted)", marginTop: 2 }}>From device</p>
-            </motion.button>
-
-            {/* Camera */}
-            <motion.button whileHover={{ scale: 1.03 }} whileTap={{ scale: 0.97 }}
-              onClick={() => cameraInputRef.current?.click()}
-              style={{
-                padding: "12px 8px", borderRadius: 12, border: "1px solid",
-                borderColor: imageSource === "camera" ? "var(--cyan)" : "rgba(47,143,255,0.18)",
-                background: imageSource === "camera" ? "rgba(6,182,212,0.14)" : "rgba(255,255,255,0.03)",
-                color: imageSource === "camera" ? "var(--cyan)" : "var(--text-secondary)",
-                cursor: "pointer", textAlign: "center"
-              }}>
-              <Camera size={20} style={{ margin: "0 auto 4px" }} />
-              <p style={{ fontSize: 11, fontWeight: 600 }}>Camera</p>
-              <p style={{ fontSize: 10, color: "var(--text-muted)", marginTop: 2 }}>Take photo</p>
-            </motion.button>
+          <p className="eyebrow" style={{ marginBottom: 16 }}>Step 2 · Image source</p>
+          <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr 1fr", gap: 10, marginBottom: 16 }}>
+            {sourceOptions.map((o) => {
+              const active = imageSource === o.key;
+              return (
+                <motion.button key={o.key} whileHover={{ scale: 1.03, y: -2 }} whileTap={{ scale: 0.97 }}
+                  onClick={o.onClick}
+                  style={{
+                    padding: "14px 8px 12px", borderRadius: 14, cursor: "pointer", textAlign: "center",
+                    border: `1.5px solid ${active ? o.accent : "var(--border)"}`,
+                    background: active ? "var(--surface)" : "var(--surface-tint)",
+                    boxShadow: active ? "var(--shadow-sm)" : "none",
+                    color: active ? o.accent : "var(--body)",
+                    transition: "border-color 0.25s var(--ease), background 0.25s var(--ease)",
+                  }}>
+                  <span style={{ display: "inline-flex", width: 34, height: 34, borderRadius: 10, alignItems: "center", justifyContent: "center", background: active ? `color-mix(in srgb, ${o.accent} 12%, white)` : "var(--bg-alt)", marginBottom: 6 }}>
+                    {o.icon}
+                  </span>
+                  <p style={{ fontSize: 11.5, fontWeight: 700 }}>{o.label}</p>
+                  <p style={{ fontSize: 10, color: "var(--muted)", marginTop: 1 }}>{o.sub}</p>
+                </motion.button>
+              );
+            })}
           </div>
 
-          {/* Hidden Inputs */}
-          <input ref={fileInputRef} type="file" accept="image/*"
-            onChange={e => { const f = e.target.files?.[0]; if (f) applyFile(f, "upload"); }}
-            className="hidden" />
-          <input ref={cameraInputRef} type="file" accept="image/*" capture="environment"
-            onChange={e => { const f = e.target.files?.[0]; if (f) applyFile(f, "camera"); }}
-            className="hidden" />
+          {/* Hidden inputs */}
+          <input ref={fileInputRef} type="file" accept="image/*" style={{ display: "none" }}
+            onChange={(e) => { const f = e.target.files?.[0]; if (f) applyFile(f, "upload"); }} />
+          <input ref={cameraInputRef} type="file" accept="image/*" capture="environment" style={{ display: "none" }}
+            onChange={(e) => { const f = e.target.files?.[0]; if (f) applyFile(f, "camera"); }} />
 
-          {/* Preview */}
+          <p className="eyebrow" style={{ marginBottom: 16 }}>Step 3 · Upload scan</p>
           {preview ? (
-            <div style={{ position: "relative", marginBottom: 16 }}>
+            <motion.div initial={{ opacity: 0, scale: 0.97 }} animate={{ opacity: 1, scale: 1 }} transition={{ duration: 0.35, ease: EASE }}
+              style={{ position: "relative", marginBottom: 18 }}>
               <img src={preview} alt="preview"
-                style={{ width: "100%", maxHeight: 200, objectFit: "contain", borderRadius: 12, border: "1px solid rgba(47,143,255,0.25)" }} />
+                style={{ width: "100%", maxHeight: 220, objectFit: "contain", borderRadius: 16, border: "1px solid var(--border)", background: "var(--surface-tint)", padding: 8 }} />
               {imageSource !== "none" && (
                 <span style={{
-                  position: "absolute", top: 8, right: 8,
-                  background: "rgba(11,17,32,0.85)", border: `1px solid ${sourceBadge[imageSource].color}`,
-                  color: sourceBadge[imageSource].color,
-                  padding: "3px 8px", borderRadius: 6, fontSize: 11, fontWeight: 600
+                  position: "absolute", top: 10, right: 10, background: "rgba(255,255,255,0.94)",
+                  border: `1.5px solid ${sourceBadge[imageSource].color}`, color: sourceBadge[imageSource].color,
+                  padding: "4px 10px", borderRadius: 100, fontSize: 11, fontWeight: 700, boxShadow: "var(--shadow-xs)",
+                  display: "inline-flex", alignItems: "center", gap: 5,
                 }}>
-                  {sourceBadge[imageSource].label}
+                  {sourceBadge[imageSource].icon} {sourceBadge[imageSource].label}
                 </span>
               )}
               <button onClick={() => { setImage(null); setPreview(null); setImageSource("none"); setResult(null); }}
                 style={{
-                  position: "absolute", bottom: 8, right: 8,
-                  background: "rgba(11,17,32,0.85)", border: "1px solid rgba(255,255,255,0.15)",
-                  color: "var(--text-secondary)", padding: "4px 10px", borderRadius: 6, fontSize: 11, cursor: "pointer"
+                  position: "absolute", bottom: 12, right: 10, background: "rgba(255,255,255,0.94)",
+                  border: "1px solid var(--border-strong)", color: "var(--body)", padding: "5px 12px",
+                  borderRadius: 100, fontSize: 11.5, fontWeight: 600, cursor: "pointer", boxShadow: "var(--shadow-xs)",
+                  display: "inline-flex", alignItems: "center", gap: 4,
                 }}>
-                ✕ Remove
+                <X size={12} /> Remove
               </button>
-            </div>
+            </motion.div>
           ) : (
-            <div
-              onDragOver={(e) => { e.preventDefault(); setDragActive(true); }}
-              onDragLeave={() => setDragActive(false)}
-              onDrop={handleDrop}
-              onClick={() => fileInputRef.current?.click()}
-              className={`dropzone ${dragActive ? "dropzone-active" : ""}`}
-              style={{ padding: 28, textAlign: "center", marginBottom: 16, color: "var(--text-secondary)", cursor: "pointer" }}
-            >
-              <motion.div animate={{ scale: dragActive ? 1.15 : 1 }} transition={{ type: "spring", stiffness: 300 }}>
-                <UploadCloud size={30} style={{ margin: "0 auto 8px", color: dragActive ? "var(--gold)" : "var(--text-muted)" }} />
-              </motion.div>
-              <p style={{ fontSize: 13, fontWeight: 600 }}>{dragActive ? "Drop to upload" : "Drag & drop a scan, or choose an option above"}</p>
-              <p style={{ fontSize: 11, marginTop: 4, color: "var(--text-muted)" }}>JPG or PNG · {scanInfo.scan}</p>
+            <div style={{ marginBottom: 18 }}>
+              <UploadZone scanLabel={scanInfo.scan} onFile={(f) => applyFile(f, "upload")} onOpenPicker={() => fileInputRef.current?.click()} />
             </div>
           )}
 
-          {/* Analyze Button */}
+          {/* Analyze button */}
           <motion.button onClick={handlePredict} disabled={!image || loading}
-            whileHover={{ scale: (!image || loading) ? 1 : 1.02 }} whileTap={{ scale: (!image || loading) ? 1 : 0.98 }}
-            className={(!image || loading) ? "" : "btn-gold"}
+            whileHover={!image || loading ? {} : { scale: 1.015 }} whileTap={!image || loading ? {} : { scale: 0.985 }}
+            className="btn"
             style={{
-              background: (loading || !image) ? 'rgba(255,255,255,0.06)' : undefined,
-              color: (loading || !image) ? 'var(--text-muted)' : 'white',
-              width: "100%", fontWeight: 900, padding: "14px", borderRadius: 12,
-              border: "none", cursor: (loading || !image) ? "not-allowed" : "pointer", fontSize: 16
+              width: "100%", fontSize: 15.5, padding: "15px 0",
+              ...(image && !loading
+                ? { background: "linear-gradient(135deg, var(--brand), var(--violet) 130%)", color: "#fff", boxShadow: "var(--shadow-brand)" }
+                : { background: "var(--bg-alt)", color: "var(--muted)", cursor: "not-allowed" }),
             }}>
-            {loading ? "⏳ Analyzing..." : `🔍 Analyze ${scanInfo.emoji}`}
+            {loading
+              ? (<><span className="btn-spinner" style={{ borderColor: "rgba(255,255,255,0.4)", borderTopColor: "#fff" }} /> Analyzing…</>)
+              : (<><Search size={16} /> Analyze <span style={{ display: "inline-flex" }}>{scanInfo.icon}</span></>)}
           </motion.button>
 
-          {/* Quick Switch */}
-          <div style={{ marginTop: 16, padding: 14, background: "rgba(47,143,255,0.05)", border: "1px solid rgba(47,143,255,0.14)", borderRadius: 12 }}>
-            <p style={{ color: "var(--text-muted)", fontSize: 11, fontWeight: 600, marginBottom: 8, letterSpacing: 1 }}>SWITCH MODEL</p>
+          {/* Quick model switch */}
+          <div style={{ marginTop: 18, padding: 14, background: "var(--surface-tint)", border: "1px solid var(--border)", borderRadius: 14 }}>
+            <p style={{ color: "var(--muted)", fontSize: 10.5, fontWeight: 700, marginBottom: 8, letterSpacing: "0.14em" }}>SWITCH MODEL</p>
             <div style={{ display: "flex", flexWrap: "wrap", gap: 6 }}>
               {Object.entries(SCAN_TYPES).map(([key, val]) => (
                 <button key={key} onClick={() => switchModel(key)}
                   style={{
-                    padding: "5px 10px", borderRadius: 8, fontSize: 11, cursor: "pointer",
-                    background: key === type ? "rgba(47,143,255,0.16)" : "none",
-                    border: key === type ? "1px solid var(--gold)" : "1px solid rgba(47,143,255,0.16)",
-                    color: key === type ? "var(--gold-light)" : "var(--text-secondary)", fontWeight: key === type ? 700 : 400,
+                    padding: "6px 12px", borderRadius: 100, fontSize: 11.5, cursor: "pointer", fontWeight: key === type ? 700 : 500,
+                    background: key === type ? "var(--brand-soft)" : "var(--surface)",
+                    border: `1px solid ${key === type ? "rgba(43,75,223,0.4)" : "var(--border)"}`,
+                    color: key === type ? "var(--brand-deep)" : "var(--body)",
+                    transition: "all 0.2s var(--ease)",
+                    display: "inline-flex", alignItems: "center", gap: 6,
                   }}>
-                  {val.emoji} {val.label}
+                  <span style={{ display: "inline-flex" }}>{val.icon}</span> {val.label}
                 </button>
               ))}
             </div>
           </div>
         </motion.div>
 
-        {/* RIGHT — Result */}
-        <motion.div initial={{ opacity: 0, x: 20 }} animate={{ opacity: 1, x: 0 }}
-          className="rounded-2xl p-6 card">
-
-          <h2 className="gold-text text-xl font-bold mb-4">📊 AI Screening Result</h2>
+        {/* ═══ RIGHT — result ═══ */}
+        <motion.div initial={{ opacity: 0, x: 26 }} animate={{ opacity: 1, x: 0 }} transition={{ duration: 0.7, delay: 0.18, ease: EASE }}
+          className="panel" style={{ padding: "28px 26px", position: "relative", overflow: "hidden" }}>
+          <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between", marginBottom: 20 }}>
+            <p className="eyebrow" style={{ marginBottom: 0 }}>Screening result</p>
+            <span className={`chip ${isNormal && result ? "chip-teal" : ""}`} style={{ display: "inline-flex", alignItems: "center", gap: 5, ...(!result ? { background: "var(--bg-alt)", color: "var(--muted)", borderColor: "var(--border)" } : {}) }}>
+              {loading
+                ? "Processing…"
+                : result
+                  ? (isNormal ? <><CheckCircle2 size={13} /> Normal indicators</> : <><AlertTriangle size={13} /> Review suggested</>)
+                  : "Awaiting scan"}
+            </span>
+          </div>
 
           {loading && <ScanAnimation image={preview} />}
 
           {!result && !loading && (
-            <div className="text-center mt-20" style={{ color: "var(--text-muted)" }}>
-              <p className="text-5xl mb-4">🩻</p>
-              <p>Choose image source and click Analyze</p>
+            <div style={{ textAlign: "center", padding: "72px 12px", color: "var(--muted)" }}>
+              <motion.div animate={{ y: [0, -8, 0] }} transition={{ duration: 4, repeat: Infinity, ease: "easeInOut" }}
+                style={{ width: 76, height: 76, margin: "0 auto 18px", borderRadius: 22, background: "linear-gradient(135deg, var(--brand-soft), var(--violet-soft))", border: "1px solid rgba(43,75,223,0.15)", display: "flex", alignItems: "center", justifyContent: "center" }}>
+                <ScanEye size={30} style={{ color: "var(--brand)" }} />
+              </motion.div>
+              <p style={{ fontSize: 15, fontWeight: 600, color: "var(--body)" }}>Your screening result will appear here</p>
+              <p style={{ fontSize: 13, marginTop: 6 }}>Choose an image source and click Analyze</p>
             </div>
           )}
 
           {result && !loading && (
-            <motion.div initial={{ opacity: 0, y: 24, scale: 0.97 }} animate={{ opacity: 1, y: 0, scale: 1 }} transition={{ type: "spring", stiffness: 120, damping: 16 }}>
+            <motion.div variants={resultContainer} initial="hidden" animate="show">
 
-              <div style={{ background: 'rgba(255,255,255,0.03)', border: '1px solid rgba(47,143,255,0.14)' }} className="rounded-xl p-4 mb-4">
-                <p style={{ color: "var(--text-muted)" }} className="text-xs">Patient</p>
-                <p style={{ color: "var(--text-primary)" }} className="font-bold text-lg">{patient.name}</p>
-                <p style={{ color: "var(--text-muted)" }} className="text-sm">Age: {patient.age} | {patient.gender}{patient.phone && ` | 📞 ${patient.phone}`}</p>
-                <p style={{ color: "var(--text-muted)" }} className="text-xs mt-1">{scanInfo.scan} | {new Date().toLocaleDateString()}</p>
-              </div>
+              {/* Patient */}
+              <motion.div variants={resultItem} style={{ background: "var(--surface-tint)", border: "1px solid var(--border)", borderRadius: 14, padding: "14px 16px", marginBottom: 14 }}>
+                <p style={{ color: "var(--muted)", fontSize: 11.5, fontWeight: 600, letterSpacing: "0.08em", textTransform: "uppercase" }}>Patient</p>
+                <p style={{ color: "var(--ink)", fontWeight: 700, fontSize: 17, fontFamily: "var(--font-display)" }}>{patient.name}</p>
+                <p style={{ color: "var(--body)", fontSize: 13, display: "flex", alignItems: "center", gap: 4, flexWrap: "wrap" }}>
+                  Age: {patient.age} · {patient.gender}
+                  {patient.phone && <span style={{ display: "inline-flex", alignItems: "center", gap: 4 }}> · <Phone size={11} /> {patient.phone}</span>}
+                </p>
+                <p style={{ color: "var(--muted)", fontSize: 11.5, marginTop: 4 }}>{scanInfo.scan} · {new Date().toLocaleDateString()}</p>
+              </motion.div>
 
-              <div style={{
-                background: isNormal ? 'rgba(34,201,166,0.12)' : 'rgba(239,68,68,0.12)',
-                border: `1px solid ${isNormal ? 'var(--red)' : '#DC2626'}`
-              }} className="p-4 rounded-xl text-center mb-4">
-                <p style={{ color: "var(--text-muted)" }} className="text-xs mb-1">Possible Finding (AI-Assisted Screening)</p>
-                <p style={{ color: "var(--text-primary)" }} className="text-2xl font-black">{isNormal ? "✅" : "⚠️"} {result.result}</p>
-                <p style={{ color: "var(--text-secondary)" }} className="mt-1">Model Confidence: <span className="gold-text font-bold"><AnimatedCounter value={`${result.confidence}%`} /></span></p>
-              </div>
+              {/* Finding — the headline moment */}
+              <motion.div variants={resultItem} style={{
+                borderRadius: 16, padding: "22px 18px", textAlign: "center", marginBottom: 14,
+                background: isNormal ? "linear-gradient(135deg, rgba(20,184,166,0.1), rgba(20,184,166,0.04))" : "linear-gradient(135deg, rgba(229,72,77,0.09), rgba(229,72,77,0.03))",
+                border: `1.5px solid ${isNormal ? "var(--teal)" : "var(--alert)"}`,
+              }}>
+                <p style={{ color: "var(--muted)", fontSize: 11.5, marginBottom: 6, fontWeight: 600, letterSpacing: "0.08em", textTransform: "uppercase" }}>Possible finding · AI-assisted screening</p>
+                <p style={{ fontFamily: "var(--font-display)", fontSize: 26, fontWeight: 700, color: "var(--ink)", letterSpacing: "-0.02em", display: "flex", alignItems: "center", justifyContent: "center", gap: 10 }}>
+                  {isNormal ? <CheckCircle2 size={24} style={{ color: "var(--teal-deep)" }} /> : <AlertTriangle size={24} style={{ color: "var(--alert)" }} />} {result.result}
+                </p>
+                <p style={{ color: "var(--body)", fontSize: 13.5, marginTop: 8 }}>
+                  Model confidence:{" "}
+                  <span className="gradient-text" style={{ fontFamily: "var(--font-display)", fontWeight: 700, fontSize: 15.5 }}>
+                    <AnimatedCounter value={`${result.confidence}%`} />
+                  </span>
+                </p>
+              </motion.div>
 
-              <div style={{ padding: "10px 14px", background: "rgba(47,143,255,0.06)", border: "1px solid rgba(47,143,255,0.16)", borderRadius: 10 }} className="mb-4">
-                <p style={{ color: "var(--text-muted)" }} className="text-xs">⚠️ This is an AI-assisted screening result, not a medical diagnosis. A qualified doctor must confirm before any treatment decision.</p>
-              </div>
+              {/* Disclaimer */}
+              <motion.div variants={resultItem} style={{ padding: "11px 14px", background: "var(--brand-soft)", border: "1px solid rgba(43,75,223,0.18)", borderRadius: 12, marginBottom: 14, display: "flex", gap: 8, alignItems: "flex-start" }}>
+                <AlertTriangle size={14} style={{ color: "var(--brand)", flexShrink: 0, marginTop: 2 }} />
+                <p style={{ color: "var(--body)", fontSize: 12, lineHeight: 1.6 }}>
+                  This is an AI-assisted screening result, not a medical diagnosis. A qualified doctor must confirm before any treatment decision.
+                </p>
+              </motion.div>
 
+              {/* Grad-CAM */}
               {result.gradcam_image && (
-                <div className="text-center mb-4">
-                  <p className="gold-text font-bold mb-2">🔍 AI Focus Area (Grad-CAM)</p>
-                  <img src={`data:image/jpeg;base64,${result.gradcam_image}`} alt="GradCAM"
-                    style={{ border: '1px solid var(--gold)' }}
-                    className="mx-auto rounded-xl max-h-48" />
-                  <p style={{ color: "var(--text-muted)" }} className="text-xs mt-2">Red/Yellow = region the AI focused on</p>
-                </div>
+                <motion.div variants={resultItem} style={{ textAlign: "center", marginBottom: 14 }}>
+                  <p className="gradient-text" style={{ fontFamily: "var(--font-display)", fontWeight: 700, fontSize: 14.5, marginBottom: 10, display: "flex", alignItems: "center", justifyContent: "center", gap: 6 }}><Search size={15} /> AI Focus Area (Grad-CAM)</p>
+                  <div style={{ display: "inline-block", padding: 4, borderRadius: 16, background: "linear-gradient(135deg, var(--brand), var(--violet))" }}>
+                    <img src={`data:image/jpeg;base64,${result.gradcam_image}`} alt="GradCAM"
+                      style={{ borderRadius: 13, maxHeight: 190, display: "block" }} />
+                  </div>
+                  <p style={{ color: "var(--muted)", fontSize: 11.5, marginTop: 8 }}>Red/Yellow = region the AI focused on</p>
+                </motion.div>
               )}
 
-              <motion.button onClick={handleDownloadPDF} disabled={pdfLoading}
-                whileHover={{ scale: pdfLoading ? 1 : 1.02 }} whileTap={{ scale: pdfLoading ? 1 : 0.98 }}
-                className={`w-full font-black py-3 rounded-xl mb-3 ${pdfLoading ? "" : "btn-gold"}`}
-                style={{ background: pdfLoading ? 'rgba(255,255,255,0.06)' : undefined, color: pdfLoading ? 'var(--text-muted)' : 'white' }}>
-                {pdfLoading ? "Generating..." : "📄 Download PDF Report"}
-              </motion.button>
+              {/* PDF report */}
+              <motion.div variants={resultItem}>
+                <motion.button onClick={handleDownloadPDF} disabled={pdfLoading}
+                  whileHover={pdfLoading ? {} : { scale: 1.015 }} whileTap={pdfLoading ? {} : { scale: 0.985 }}
+                  className="btn"
+                  style={{
+                    width: "100%", marginBottom: 14, fontSize: 15,
+                    ...(pdfLoading
+                      ? { background: "var(--bg-alt)", color: "var(--muted)", cursor: "not-allowed" }
+                      : { background: "linear-gradient(135deg, var(--teal-deep), var(--teal))", color: "#fff", boxShadow: "0 8px 24px rgba(14,140,127,0.32)" }),
+                  }}>
+                  {pdfLoading ? (<><span className="btn-spinner" style={{ borderColor: "rgba(255,255,255,0.4)", borderTopColor: "#fff" }} /> Generating…</>) : (<><FileText size={16} /> Download PDF Report</>)}
+                </motion.button>
+              </motion.div>
 
-              <div style={{ padding: 12, background: "rgba(47,143,255,0.05)", border: "1px solid rgba(47,143,255,0.12)", borderRadius: 12 }}>
-                <p style={{ color: "var(--text-muted)", fontSize: 11, marginBottom: 8 }}>🔄 Try another model:</p>
+              {/* Other models */}
+              <motion.div variants={resultItem} style={{ padding: 12, background: "var(--surface-tint)", border: "1px solid var(--border)", borderRadius: 14 }}>
+                <p style={{ color: "var(--muted)", fontSize: 11.5, marginBottom: 8, display: "flex", alignItems: "center", gap: 6 }}><RefreshCw size={12} /> Try another model:</p>
                 <div style={{ display: "flex", flexWrap: "wrap", gap: 6 }}>
                   {Object.entries(SCAN_TYPES).filter(([k]) => k !== type).map(([key, val]) => (
                     <button key={key} onClick={() => switchModel(key)}
-                      style={{
-                        padding: "5px 10px", borderRadius: 8, fontSize: 11, cursor: "pointer",
-                        background: "none", border: "1px solid rgba(47,143,255,0.18)", color: "var(--text-secondary)",
-                      }}>
-                      {val.emoji} {val.label}
+                      style={{ padding: "6px 12px", borderRadius: 100, fontSize: 11.5, cursor: "pointer", background: "var(--surface)", border: "1px solid var(--border)", color: "var(--body)", transition: "all 0.2s var(--ease)", display: "inline-flex", alignItems: "center", gap: 6 }}>
+                      <span style={{ display: "inline-flex" }}>{val.icon}</span> {val.label}
                     </button>
                   ))}
                 </div>
-              </div>
+              </motion.div>
             </motion.div>
           )}
         </motion.div>
+      </div>
+
+      {/* Footer strip */}
+      <div style={{ borderTop: "1px solid var(--border)", padding: "22px 24px", display: "flex", justifyContent: "space-between", flexWrap: "wrap", gap: 10, fontSize: 12.5, color: "var(--muted)", position: "relative", zIndex: 1 }}>
+        <span>MedAI Platform · {scanInfo.label} pipeline</span>
+        <Link href="/ai-doctor" style={{ color: "var(--brand)", textDecoration: "none", fontWeight: 600, display: "inline-flex", alignItems: "center", gap: 5 }}>Not sure which scan? Try the AI Health Assistant <ArrowRight size={14} /></Link>
       </div>
     </main>
   );

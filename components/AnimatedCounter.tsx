@@ -3,9 +3,8 @@ import { useEffect, useRef, useState } from "react";
 import { motion, useInView, animate } from "framer-motion";
 
 /**
- * Renders a stat value like "85%", "<3s", "50K+", "3" and animates the
- * numeric portion counting up from 0 when it scrolls into view, keeping
- * any non-numeric prefix/suffix (%, <, s, K+) intact.
+ * Renders a stat value like "85%", "<3s", "50K+", "3" and counts the numeric
+ * portion up from 0 when scrolled into view, preserving prefix/suffix text.
  */
 export default function AnimatedCounter({ value, duration = 1.6 }: { value: string; duration?: number }) {
   const ref = useRef<HTMLSpanElement>(null);
@@ -25,7 +24,7 @@ export default function AnimatedCounter({ value, duration = 1.6 }: { value: stri
     }
     const controls = animate(0, numeric, {
       duration,
-      ease: "easeOut",
+      ease: [0.22, 1, 0.36, 1],
       onUpdate: (v) => setDisplay(`${prefix}${v.toFixed(decimals)}${suffix}`),
     });
     return () => controls.stop();
@@ -33,7 +32,12 @@ export default function AnimatedCounter({ value, duration = 1.6 }: { value: stri
   }, [inView]);
 
   return (
-    <motion.span ref={ref} initial={{ opacity: 0 }} animate={{ opacity: 1 }} transition={{ duration: 0.4 }}>
+    <motion.span
+      ref={ref}
+      initial={{ opacity: 0, y: 10 }}
+      animate={inView ? { opacity: 1, y: 0 } : {}}
+      transition={{ duration: 0.5, ease: [0.22, 1, 0.36, 1] }}
+    >
       {display}
     </motion.span>
   );

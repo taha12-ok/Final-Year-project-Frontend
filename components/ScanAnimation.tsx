@@ -1,6 +1,7 @@
 "use client";
 import { useEffect, useState } from "react";
 import { motion, AnimatePresence } from "framer-motion";
+import { ScanLine } from "lucide-react";
 
 const STAGES = [
   "Uploading Image",
@@ -11,10 +12,10 @@ const STAGES = [
 ];
 
 /**
- * Shows a glass-framed scanning animation with rotating stage labels while
- * a real request is in flight. The stage index is cosmetic — it does not
- * know when the backend actually finishes each step, it just cycles for
- * as long as the parent keeps this component mounted.
+ * Branded loading state while a scan request is in flight: the uploaded
+ * image framed with a sweep line + rotating ring, cycling stage labels,
+ * skeleton rows and stage dots. The stage index is cosmetic — it cycles
+ * for as long as the parent keeps this component mounted.
  */
 export default function ScanAnimation({ image }: { image?: string | null }) {
   const [stage, setStage] = useState(0);
@@ -27,18 +28,23 @@ export default function ScanAnimation({ image }: { image?: string | null }) {
   }, []);
 
   return (
-    <div style={{ textAlign: "center", padding: "24px 12px" }}>
+    <div style={{ textAlign: "center", padding: "28px 12px" }}>
       <div
-        className="glass-surface scan-sweep"
+        className="scan-sweep"
         style={{
-          width: 160, height: 160, margin: "0 auto 20px",
-          borderRadius: 20, position: "relative", overflow: "hidden",
+          width: 168, height: 168, margin: "0 auto 22px",
+          borderRadius: 22, position: "relative", overflow: "hidden",
+          background: "var(--surface-tint)",
+          border: "1px solid var(--border)",
+          boxShadow: "var(--shadow-sm)",
         }}
       >
         {image ? (
-          <img src={image} alt="Analyzing" style={{ width: "100%", height: "100%", objectFit: "cover", opacity: 0.85 }} />
+          <img src={image} alt="Analyzing" style={{ width: "100%", height: "100%", objectFit: "cover", opacity: 0.9 }} />
         ) : (
-          <div style={{ width: "100%", height: "100%", display: "flex", alignItems: "center", justifyContent: "center", fontSize: 40 }}>🩻</div>
+          <div style={{ width: "100%", height: "100%", display: "flex", alignItems: "center", justifyContent: "center", color: "var(--brand)" }}>
+            <ScanLine size={44} />
+          </div>
         )}
 
         {/* Rotating processing ring */}
@@ -46,10 +52,10 @@ export default function ScanAnimation({ image }: { image?: string | null }) {
           animate={{ rotate: 360 }}
           transition={{ duration: 3, repeat: Infinity, ease: "linear" }}
           style={{
-            position: "absolute", inset: 6, borderRadius: 16,
+            position: "absolute", inset: 6, borderRadius: 17,
             border: "2px solid transparent",
-            borderTopColor: "var(--gold)",
-            borderRightColor: "rgba(6,182,212,0.6)",
+            borderTopColor: "var(--brand)",
+            borderRightColor: "rgba(124,92,252,0.55)",
           }}
         />
       </div>
@@ -60,13 +66,20 @@ export default function ScanAnimation({ image }: { image?: string | null }) {
           initial={{ opacity: 0, y: 8 }}
           animate={{ opacity: 1, y: 0 }}
           exit={{ opacity: 0, y: -8 }}
-          transition={{ duration: 0.3 }}
-          style={{ fontWeight: 700, fontSize: 15, color: "var(--gold)", marginBottom: 4 }}
+          transition={{ duration: 0.3, ease: [0.22, 1, 0.36, 1] }}
+          style={{ fontFamily: "var(--font-display)", fontWeight: 700, fontSize: 15.5, color: "var(--ink)", marginBottom: 4 }}
         >
           {STAGES[stage]}
         </motion.p>
       </AnimatePresence>
-      <p style={{ fontSize: 12, color: "var(--text-muted)", marginBottom: 16 }}>AI is analyzing the scan…</p>
+      <p style={{ fontSize: 12.5, color: "var(--muted)", marginBottom: 18 }}>AI is analyzing the scan…</p>
+
+      {/* Skeleton preview of the incoming result */}
+      <div style={{ maxWidth: 260, margin: "0 auto 20px", display: "flex", flexDirection: "column", gap: 8 }}>
+        <div className="skeleton" style={{ height: 12, width: "85%", margin: "0 auto" }} />
+        <div className="skeleton" style={{ height: 12, width: "60%", margin: "0 auto" }} />
+        <div className="skeleton" style={{ height: 12, width: "72%", margin: "0 auto" }} />
+      </div>
 
       {/* Stage dots */}
       <div style={{ display: "flex", justifyContent: "center", gap: 6 }}>
@@ -74,11 +87,11 @@ export default function ScanAnimation({ image }: { image?: string | null }) {
           <div
             key={i}
             style={{
-              width: i === stage ? 18 : 6,
+              width: i === stage ? 20 : 6,
               height: 6,
               borderRadius: 4,
-              background: i <= stage ? "var(--gold)" : "rgba(37,99,235,0.18)",
-              transition: "all 0.3s ease",
+              background: i <= stage ? "linear-gradient(90deg, var(--brand), var(--violet))" : "rgba(43,75,223,0.16)",
+              transition: "all 0.35s var(--ease)",
             }}
           />
         ))}

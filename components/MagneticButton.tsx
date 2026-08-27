@@ -7,23 +7,22 @@ interface MagneticButtonProps {
   className?: string;
   style?: React.CSSProperties;
   onClick?: () => void;
-  as?: "button" | "div";
   strength?: number;
 }
 
-/** Wraps a button-like element with a subtle magnetic pull toward the cursor. */
+/** Wraps a CTA with a subtle magnetic pull toward the cursor (premium hover feel). */
 export default function MagneticButton({
   children,
   className,
   style,
   onClick,
-  strength = 10,
+  strength = 12,
 }: MagneticButtonProps) {
   const ref = useRef<HTMLDivElement>(null);
   const x = useMotionValue(0);
   const y = useMotionValue(0);
-  const springX = useSpring(x, { stiffness: 200, damping: 16 });
-  const springY = useSpring(y, { stiffness: 200, damping: 16 });
+  const springX = useSpring(x, { stiffness: 220, damping: 18 });
+  const springY = useSpring(y, { stiffness: 220, damping: 18 });
 
   const handleMove = (e: React.MouseEvent<HTMLDivElement>) => {
     const rect = ref.current?.getBoundingClientRect();
