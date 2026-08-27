@@ -77,7 +77,7 @@ export default function AnalyzePage() {
     }
   };
 
-  const handlePredict = async () => {
+    const handlePredict = async () => {
     if (!image || !patient.name || !patient.age || !patient.gender) {
       alert("Please fill all patient details and select an image!");
       return;
@@ -85,7 +85,11 @@ export default function AnalyzePage() {
     setLoading(true);
     const formData = new FormData();
     formData.append("file", image);
-    const res  = await fetch(`${BACKEND_URL}/predict/${type}`, { method: "POST", body: formData });
+    const res  = await fetch(`${BACKEND_URL}/predict/${type}`, {
+      method: "POST",
+      headers: { "ngrok-skip-browser-warning": "true" },
+      body: formData,
+    });
     const data = await res.json();
     setResult(data);
     setLoading(false);
@@ -104,7 +108,11 @@ export default function AnalyzePage() {
     formData.append("confidence", result.confidence.toString());
     formData.append("gradcam_image", result.gradcam_image);
     formData.append("scan_type", scanInfo.scan);
-    const res  = await fetch(`${BACKEND_URL}/generate-report`, { method: "POST", body: formData });
+    const res  = await fetch(`${BACKEND_URL}/generate-report`, {
+      method: "POST",
+      headers: { "ngrok-skip-browser-warning": "true" },
+      body: formData,
+    });
     const blob = await res.blob();
     const url  = window.URL.createObjectURL(blob);
     const a    = document.createElement("a");
