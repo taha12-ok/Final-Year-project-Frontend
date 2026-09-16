@@ -1,12 +1,12 @@
 "use client";
-import { useState, useRef, cloneElement, isValidElement, type ReactNode } from "react";
+import { useState, useEffect, useRef, cloneElement, isValidElement, type ReactNode } from "react";
 import { motion, AnimatePresence, type Variants } from "framer-motion";
 import Link from "next/link";
 import { useParams, useRouter } from "next/navigation";
 import {
   ChevronDown, Camera, Upload, FlaskConical, FileText, ScanEye,
   Bone, Brain, Droplets, Search, Check, AlertTriangle, CheckCircle2,
-  Phone, RefreshCw, X, FolderOpen, ArrowRight,
+  Phone, RefreshCw, X, FolderOpen, ArrowRight, ImageOff, Stethoscope,
 } from "lucide-react";
 import Navbar from "@/components/Navbar";
 import ScanAnimation from "@/components/ScanAnimation";
@@ -36,6 +36,20 @@ const resultItem: Variants = {
 // ── Backend URL from environment variable ──
 const BACKEND_URL = process.env.NEXT_PUBLIC_BACKEND_URL || "http://127.0.0.1:8000";
 
+/** URL query se patient prefill (assistant handoff) + concern note */
+function prefillFromQuery(): { patient: { name: string; age: string; gender: string; phone: string }; concern: string } {
+  const q = typeof window !== "undefined" ? new URLSearchParams(window.location.search) : new URLSearchParams();
+  return {
+    patient: {
+      name: q.get("name") || "",
+      age: q.get("age") || "",
+      gender: q.get("gender") || "",
+      phone: "",
+    },
+    concern: q.get("concern") || "",
+  };
+}
+
 export default function AnalyzePage() {
   const params   = useParams();
   const router   = useRouter();
@@ -52,13 +66,25 @@ export default function AnalyzePage() {
   const [loading,      setLoading]      = useState(false);
   const [pdfLoading,   setPdfLoading]   = useState(false);
   const [dropdownOpen, setDropdownOpen] = useState(false);
+  const [errorMsg,     setErrorMsg]     = useState<string | null>(null);
+  const [notScanWarn,  setNotScanWarn]  = useState(false);
+  const [concern,      setConcern]      = useState("");
   const [patient,      setPatient]      = useState({ name: "", age: "", gender: "", phone: "" });
+
+  // ── Assistant handoff prefill (sirf pehli mount pe) ──
+  useEffect(() => {
+    const { patient: p, concern: c } = prefillFromQuery();
+    if (p.name || p.age || p.gender) setPatient((prev) => ({ ...prev, ...p, phone: prev.phone }));
+    if (c) setConcern(c);
+  }, []);
 
   // ── File set karo ──
   const applyFile = (file: File, source: "upload" | "camera") => {
     setImage(file);
     setPreview(URL.createObjectURL(file));
     setResult(null);
+    setErrorMsg(null);
+    setNotScanWarn(false);
     setImageSource(source);
   };
 
@@ -77,22 +103,62 @@ export default function AnalyzePage() {
     }
   };
 
-    const handlePredict = async () => {
+  const handlePredict = async () => {
     if (!image || !patient.name || !patient.age || !patient.gender) {
-      alert("Please fill all patient details and select an image!");
+      setErrorMsg("Please fill all patient details and select an image!");
       return;
     }
     setLoading(true);
+    setErrorMsg(null);
+    setResult(null);
+    setNotScanWarn(false);
     const formData = new FormData();
     formData.append("file", image);
-    const res  = await fetch(`${BACKEND_URL}/predict/${type}`, {
-      method: "POST",
-      headers: { "ngrok-skip-browser-warning": "true" },
-      body: formData,
-    });
-    const data = await res.json();
-    setResult(data);
-    setLoading(false);
+    try {
+      const res  = await fetch(`${BACKEND_URL}/predict/${type}`, {
+        method: "POST",
+        headers: { "ngrok-skip-browser-warning": "true" },
+        body: formData,
+      });
+
+      if (!res.ok) {
+        // Structured backend errors (FastAPI detail object ya plain text)
+        let apiDetail: any = null;
+        let rawText = "";
+        try {
+          rawText = await res.text();
+          apiDetail = JSON.parse(rawText);
+        } catch { apiDetail = null; }
+
+        const detail = apiDetail?.detail ?? apiDetail;
+        if (detail && typeof detail === "object" && detail.error === "not_a_scan") {
+          setNotScanWarn(true);
+          setErrorMsg(detail.message || "Yeh medical scan nahi lagti — proper X-ray/MRI/CT upload karein.");
+        } else if (res.status === 429) {
+          setErrorMsg("Bohat zyada requests — ek minute baad try karein.");
+        } else if (res.status === 413) {
+          setErrorMsg((typeof detail === "string" ? detail : null) || "File bohat bari hai (max 10 MB).");
+        } else {
+          setErrorMsg(
+            (typeof detail === "string" && detail) ||
+            detail?.message ||
+            `Backend error (${res.status}). Check: backend chal raha hai? NEXT_PUBLIC_BACKEND_URL sahi hai?`
+          );
+        }
+        return;
+      }
+
+      const data = await res.json();
+      setResult(data);
+    } catch (e: any) {
+      setErrorMsg(
+        "Backend se connect nahi ho paya. " +
+        "Agar locally chala rahe ho to backend start karo (uvicorn main:app --port 8000); " +
+        "deployed backend ka URL NEXT_PUBLIC_BACKEND_URL me set karo."
+      );
+    } finally {
+      setLoading(false);
+    }
   };
 
   const handleDownloadPDF = async () => {
@@ -106,18 +172,26 @@ export default function AnalyzePage() {
     formData.append("phone", patient.phone);
     formData.append("result", result.result);
     formData.append("confidence", result.confidence.toString());
-    formData.append("gradcam_image", result.gradcam_image);
+    formData.append("gradcam_image", result.gradcam_image || "");
     formData.append("scan_type", scanInfo.scan);
-    const res  = await fetch(`${BACKEND_URL}/generate-report`, {
-      method: "POST",
-      headers: { "ngrok-skip-browser-warning": "true" },
-      body: formData,
-    });
-    const blob = await res.blob();
-    const url  = window.URL.createObjectURL(blob);
-    const a    = document.createElement("a");
-    a.href = url; a.download = `report_${patient.name}.pdf`; a.click();
-    setPdfLoading(false);
+    formData.append("inconclusive", result.reliability?.inconclusive ? "true" : "false");
+    try {
+      const res  = await fetch(`${BACKEND_URL}/generate-report`, {
+        method: "POST",
+        headers: { "ngrok-skip-browser-warning": "true" },
+        body: formData,
+      });
+      if (!res.ok) throw new Error(`Report failed (${res.status})`);
+      const blob = await res.blob();
+      const url  = window.URL.createObjectURL(blob);
+      const a    = document.createElement("a");
+      a.href = url; a.download = `report_${patient.name}.pdf`; a.click();
+      window.URL.revokeObjectURL(url);
+    } catch (e: any) {
+      setErrorMsg(e.message || "PDF report generate nahi ho payi — dobara try karein.");
+    } finally {
+      setPdfLoading(false);
+    }
   };
 
   const switchModel = (key: string) => {
@@ -202,6 +276,12 @@ export default function AnalyzePage() {
           <span className="gradient-text">{scanInfo.label}</span>
         </h1>
         <p style={{ color: "var(--muted)", fontSize: 15.5, marginTop: 8 }}>Upload a {scanInfo.scan} image for AI-assisted screening</p>
+        {concern && (
+          <div style={{ display: "inline-flex", alignItems: "center", gap: 8, marginTop: 14, padding: "8px 16px", background: "var(--violet-soft)", border: "1px solid rgba(124,92,252,0.3)", borderRadius: 100 }}>
+            <Stethoscope size={14} style={{ color: "#5B3FE4" }} />
+            <span style={{ fontSize: 12.5, color: "#5B3FE4", fontWeight: 600 }}>AI Assistant note: {concern}</span>
+          </div>
+        )}
       </motion.div>
 
       {/* ── Main grid ── */}
@@ -337,6 +417,24 @@ export default function AnalyzePage() {
 
           {loading && <ScanAnimation image={preview} />}
 
+          {/* Error / not-a-scan warning */}
+          {errorMsg && !loading && (
+            <motion.div initial={{ opacity: 0, y: 10 }} animate={{ opacity: 1, y: 0 }}
+              style={{ padding: "14px 16px", borderRadius: 14, marginBottom: 14, display: "flex", gap: 10, alignItems: "flex-start",
+                background: notScanWarn ? "rgba(245,158,11,0.08)" : "rgba(229,72,77,0.07)",
+                border: `1.5px solid ${notScanWarn ? "#f59e0b" : "var(--alert)"}` }}>
+              {notScanWarn
+                ? <ImageOff size={18} style={{ color: "#d97706", flexShrink: 0, marginTop: 2 }} />
+                : <AlertTriangle size={18} style={{ color: "var(--alert)", flexShrink: 0, marginTop: 2 }} />}
+              <div>
+                <p style={{ fontWeight: 700, fontSize: 13.5, color: notScanWarn ? "#d97706" : "var(--alert)", marginBottom: 3 }}>
+                  {notScanWarn ? "Yeh medical scan nahi lagti" : "Kuch masla hua"}
+                </p>
+                <p style={{ fontSize: 12.5, color: "var(--body)", lineHeight: 1.6 }}>{errorMsg}</p>
+              </div>
+            </motion.div>
+          )}
+
           {!result && !loading && (
             <div style={{ textAlign: "center", padding: "72px 12px", color: "var(--muted)" }}>
               <motion.div animate={{ y: [0, -8, 0] }} transition={{ duration: 4, repeat: Infinity, ease: "easeInOut" }}
@@ -380,6 +478,16 @@ export default function AnalyzePage() {
                 </p>
               </motion.div>
 
+              {/* Inconclusive warning */}
+              {result.reliability?.inconclusive && (
+                <motion.div variants={resultItem} style={{ padding: "12px 14px", background: "rgba(245,158,11,0.09)", border: "1.5px solid #f59e0b", borderRadius: 12, marginBottom: 14, display: "flex", gap: 8, alignItems: "flex-start" }}>
+                  <AlertTriangle size={15} style={{ color: "#d97706", flexShrink: 0, marginTop: 2 }} />
+                  <p style={{ color: "#92400e", fontSize: 12.5, lineHeight: 1.6 }}>
+                    <strong>Inconclusive:</strong> {result.reliability.message}
+                  </p>
+                </motion.div>
+              )}
+
               {/* Disclaimer */}
               <motion.div variants={resultItem} style={{ padding: "11px 14px", background: "var(--brand-soft)", border: "1px solid rgba(43,75,223,0.18)", borderRadius: 12, marginBottom: 14, display: "flex", gap: 8, alignItems: "flex-start" }}>
                 <AlertTriangle size={14} style={{ color: "var(--brand)", flexShrink: 0, marginTop: 2 }} />
@@ -397,6 +505,28 @@ export default function AnalyzePage() {
                       style={{ borderRadius: 13, maxHeight: 190, display: "block" }} />
                   </div>
                   <p style={{ color: "var(--muted)", fontSize: 11.5, marginTop: 8 }}>Red/Yellow = region the AI focused on</p>
+                </motion.div>
+              )}
+
+              {/* All class probabilities + calibration info */}
+              {result.alternatives && (
+                <motion.div variants={resultItem} style={{ padding: 13, background: "var(--surface-tint)", border: "1px solid var(--border)", borderRadius: 14, marginBottom: 14 }}>
+                  <p style={{ color: "var(--muted)", fontSize: 10.5, fontWeight: 700, letterSpacing: "0.12em", marginBottom: 9 }}>ALL CLASS PROBABILITIES</p>
+                  {[{ "class": result.result, confidence: result.confidence }, ...result.alternatives].map((a: any, i: number) => (
+                    <div key={i} style={{ display: "flex", alignItems: "center", gap: 10, marginBottom: 5 }}>
+                      <span style={{ fontSize: 12, width: 112, fontWeight: i === 0 ? 700 : 500, color: i === 0 ? "var(--ink)" : "var(--body)", flexShrink: 0 }}>{a.class}</span>
+                      <div style={{ flex: 1, height: 7, borderRadius: 4, background: "var(--bg-alt)", overflow: "hidden" }}>
+                        <motion.div initial={{ width: 0 }} animate={{ width: `${a.confidence}%` }} transition={{ duration: 0.8, ease: EASE, delay: 0.2 + i * 0.08 }}
+                          style={{ height: "100%", borderRadius: 4, background: i === 0 ? "linear-gradient(90deg, var(--brand), var(--violet))" : "var(--border-strong)" }} />
+                      </div>
+                      <span style={{ fontSize: 11.5, color: "var(--muted)", width: 46, textAlign: "right", flexShrink: 0 }}>{a.confidence}%</span>
+                    </div>
+                  ))}
+                  {result.calibration?.temperature != null && (
+                    <p style={{ fontSize: 10.5, color: "var(--muted)", marginTop: 8 }}>
+                      Calibrated (temperature = {result.calibration.temperature}) · modality gate score: {result.modality_gate?.score ?? "—"} ({result.modality_gate?.source ?? "—"})
+                    </p>
+                  )}
                 </motion.div>
               )}
 

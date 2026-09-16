@@ -3,7 +3,7 @@ import { useState, useRef, useEffect, cloneElement, isValidElement, type ReactEl
 import { motion, AnimatePresence, Variants } from "framer-motion";
 import Link from "next/link";
 import {
-  Activity, Shield, Zap, FileText, Brain, Stethoscope,
+  Activity, Shield, Zap, FileText, Brain, Stethoscope, FlaskConical,
   ChevronDown, ArrowRight, ArrowUpRight, Sparkles,
   Bone, Droplets, Upload, UserRound, Bot, Settings,
   Flame, BarChart3, Check, AlertTriangle, Rocket, Mail, Plus,
@@ -250,6 +250,11 @@ export default function LandingPage() {
               <MagneticButton>
                 <Link href="/ai-doctor" className="btn btn-secondary" style={{ fontSize: 15.5 }}>
                   <Stethoscope size={16} /> AI Health Assistant
+                </Link>
+              </MagneticButton>
+              <MagneticButton>
+                <Link href="/lab" className="btn btn-secondary" style={{ fontSize: 15.5 }}>
+                  <FlaskConical size={16} /> Model Lab
                 </Link>
               </MagneticButton>
             </motion.div>
