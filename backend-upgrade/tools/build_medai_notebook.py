@@ -193,7 +193,7 @@ datasets.ImageFolder = SafeImageFolder  # baaki sab code ko bhi safe bana do
 OUT = "/kaggle/working/medai_v2"
 os.makedirs(f"{OUT}/metrics", exist_ok=True)
 
-FAST_TEST = True   # <-- pehli baar True chalao (pipeline sanity, ~30 min); phir False karke full run
+FAST_TEST = False   # <-- pehli baar True chalao (pipeline sanity, ~30 min); phir False karke full run
 NUM_EPOCHS = 1 if FAST_TEST else 14
 BATCH_SIZE = 16 if FAST_TEST else 64
 
@@ -729,43 +729,56 @@ else:
 # ─────────────────────────────────────────────────────────────
 code_onnx = r'''# ── 5) ONNX EXPORT — free hosting (Render 512MB) ke liye ──
 # Har trained model ko ONNX me convert + dynamic int8 quantize (~24MB each).
-import onnx
-from onnxruntime.quantization import quantize_dynamic, QuantType
+# NOTE: Ye cell FAIL hone par bhi package cell chalega (models .pth me safe hain).
+import subprocess, sys as _sys
+print("onnxruntime install ho raha hai...")
+subprocess.run([_sys.executable, "-m", "pip", "install", "-q", "onnxruntime==1.17.0", "onnx==1.15.0"], check=False)
+try:
+    import onnx
+    from onnxruntime.quantization import quantize_dynamic, QuantType
+    ONNX_OK = True
+except Exception as e:
+    print(f"⚠️ ONNX import fail: {e} — export skip, lekin .pth models safe hain")
+    ONNX_OK = False
 
 def export_onnx(name, num_classes):
+    if not ONNX_OK:
+        return
     pth = f"{OUT}/{name}_model.pth"
     if not os.path.exists(pth):
         print(f"⚠️ {name}_model.pth nahi mila (training cell fail/skip hua) — export skip")
         return
-    print(f"\n⏳ Exporting {name} → ONNX...")
-    m = build_model(num_classes)
-    m.load_state_dict(torch.load(pth, map_location="cpu"))
-    m.eval()
+    try:
+        print(f"\n⏳ Exporting {name} → ONNX...")
+        m = build_model(num_classes)
+        m.load_state_dict(torch.load(pth, map_location="cpu"))
+        m.eval()
 
-    dummy = torch.randn(1, 3, 224, 224)
-    onnx_path = f"{OUT}/{name}_model.onnx"
-    torch.onnx.export(
-        m, dummy, onnx_path,
-        input_names=["input"], output_names=["logits"],
-        dynamic_axes={"input": {0: "batch"}, "logits": {0: "batch"}},
-        opset_version=13,
-        do_constant_folding=False,
-    )
-    print(f"  ✅ {name}_model.onnx ({os.path.getsize(onnx_path)/1e6:.1f} MB)")
+        dummy = torch.randn(1, 3, 224, 224)
+        onnx_path = f"{OUT}/{name}_model.onnx"
+        torch.onnx.export(
+            m, dummy, onnx_path,
+            input_names=["input"], output_names=["logits"],
+            dynamic_axes={"input": {0: "batch"}, "logits": {0: "batch"}},
+            opset_version=13,
+            do_constant_folding=False,
+        )
+        print(f"  ✅ {name}_model.onnx ({os.path.getsize(onnx_path)/1e6:.1f} MB)")
 
-    q_path = f"{OUT}/{name}_model_int8.onnx"
-    quantize_dynamic(onnx_path, q_path, weight_type=QuantType.QInt8)
-    print(f"  ✅ {name}_model_int8.onnx ({os.path.getsize(q_path)/1e6:.1f} MB)")
+        q_path = f"{OUT}/{name}_model_int8.onnx"
+        quantize_dynamic(onnx_path, q_path, weight_type=QuantType.QInt8)
+        print(f"  ✅ {name}_model_int8.onnx ({os.path.getsize(q_path)/1e6:.1f} MB)")
 
-    import onnxruntime as ort
-    sess = ort.InferenceSession(q_path, providers=["CPUExecutionProvider"])
-    out = sess.run(None, {"input": dummy.numpy()})[0]
-    with torch.no_grad():
-        ref = m(dummy).numpy()
-    diff = float(abs(out - ref).max())
-    print(f"  🔍 max logit diff vs PyTorch: {diff:.4f} (<0.1 good)")
-
-    del m
+        import onnxruntime as ort
+        sess = ort.InferenceSession(q_path, providers=["CPUExecutionProvider"])
+        out = sess.run(None, {"input": dummy.numpy()})[0]
+        with torch.no_grad():
+            ref = m(dummy).numpy()
+        diff = float(abs(out - ref).max())
+        print(f"  🔍 max logit diff vs PyTorch: {diff:.4f} (<0.1 good)")
+        del m
+    except Exception as e:
+        print(f"⚠️ {name} ONNX export fail ({e}) — .pth waise hi package me jayega")
 
 export_onnx("fracture", 2)
 export_onnx("brain", 4)
