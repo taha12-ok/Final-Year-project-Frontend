@@ -9,7 +9,7 @@ import {
 import Navbar from "@/components/Navbar";
 import { EASE } from "@/components/Reveal";
 
-const BACKEND_URL = process.env.NEXT_PUBLIC_BACKEND_URL || "http://127.0.0.1:8000";
+const BACKEND_URL = process.env.NEXT_PUBLIC_BACKEND_URL || "https://tahashabbir-medai-backend.hf.space";
 
 interface Metrics {
   available?: boolean;
@@ -76,7 +76,7 @@ function ConfusionMatrix({ cm, classes, accent }: { cm: number[][]; classes: str
         ))}
       </div>
       <p style={{ fontSize: 10, color: "var(--muted)", textAlign: "center", marginTop: 8 }}>
-        Rows = actual · Columns = predicted · <span style={{ color: "var(--brand)" }}>diagonal = sahi predictions</span>
+        Rows = actual · Columns = predicted · <span style={{ color: "var(--brand)" }}>diagonal = correct predictions</span>
       </p>
     </div>
   );
@@ -119,7 +119,7 @@ function ModelCard({ m, metrics, delay }: { m: (typeof MODELS)[0]; metrics: Metr
         <div style={{ padding: "26px 10px", textAlign: "center", color: "var(--muted)", fontSize: 12.5, lineHeight: 1.7, background: "var(--surface-tint)", borderRadius: 14, border: "1px dashed var(--border-strong)" }}>
           Retraining metrics abhi deploy nahi hui.<br />
           <span style={{ fontSize: 11.5 }}>
-            Kaggle notebook run karke <code style={{ background: "var(--bg-alt)", padding: "1px 6px", borderRadius: 6 }}>metrics/{m.key}.json</code> backend ke <code style={{ background: "var(--bg-alt)", padding: "1px 6px", borderRadius: 6 }}>metrics/</code> folder me dalein.
+            Run the Kaggle notebook and place <code style={{ background: "var(--bg-alt)", padding: "1px 6px", borderRadius: 6 }}>metrics/{m.key}.json</code> in the backend's <code style={{ background: "var(--bg-alt)", padding: "1px 6px", borderRadius: 6 }}>metrics/</code> folder.
           </span>
         </div>
       ) : (
@@ -228,7 +228,7 @@ export default function LabPage() {
           <div style={{ display: "inline-flex", alignItems: "center", gap: 8, marginTop: 16, padding: "9px 16px", background: "rgba(229,72,77,0.08)", border: "1px solid var(--alert)", borderRadius: 100 }}>
             <AlertTriangle size={14} style={{ color: "var(--alert)" }} />
             <span style={{ fontSize: 12.5, color: "var(--alert)", fontWeight: 600 }}>
-              Backend offline ({BACKEND_URL}) — deployed backend URL ke saath phir se kholen
+              Backend offline ({BACKEND_URL}) — open this page with the deployed backend URL
             </span>
           </div>
         )}

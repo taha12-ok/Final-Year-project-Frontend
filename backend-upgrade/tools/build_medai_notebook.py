@@ -34,8 +34,8 @@ md_intro = r"""# 🏥 MedAI Model Retraining Kit (v2)
 # ─────────────────────────────────────────────────────────────
 # Cell 1 — setup
 # ─────────────────────────────────────────────────────────────
-code_setup = r'''# ── Setup: imports, config, reproducibility ──
-import os, json, shutil, random, zipfile, textwrap
+code_setup = r'''# ── Setup: imports, config, reproducibility, GPU guard ──
+import os, json, shutil, random, zipfile, textwrap, glob
 import numpy as np
 import torch
 import torch.nn as nn
@@ -48,10 +48,57 @@ random.seed(SEED); np.random.seed(SEED); torch.manual_seed(SEED)
 DEVICE = torch.device("cuda" if torch.cuda.is_available() else "cpu")
 print(f"Device: {DEVICE}")
 
-# Ye paths Kaggle dataset mount points hain (Add Input se auto ban jate hain)
-FRACTURE_ROOT = "/kaggle/input/fracture-multi-region-x-ray-data"
-BRAIN_ROOT    = "/kaggle/input/brain-tumor-mri-dataset"
-KIDNEY_ROOT   = "/kaggle/input/ct-kidney-dataset-normal-cyst-tumor-and-stone"
+# ⚠️ GPU GUARD: bina GPU ke training bahut slow hoga (CPU pe din lag jayenge).
+# Kaggle: right side Settings -> Accelerator -> GPU T4 x2 select karo, phir Run All.
+if DEVICE.type != "cuda":
+    raise RuntimeError(
+        "❌ GPU nahi mila!\n"
+        "   Kaggle me right panel → Session options → Accelerator → 'GPU T4 x2' select karo\n"
+        "   phir session restart ho gaya ke baad Run All dobara chalao."
+    )
+
+# ─────────────────────────────────────────────────────────────
+# SMART DATASET DISCOVERY — jo bhi datasets add kiye hain, khud dhoond lega.
+# /kaggle/input ke andar keywords se match karta hai (slug thora alag ho to bhi chalega).
+# ─────────────────────────────────────────────────────────────
+INPUT_ROOT = "/kaggle/input"
+
+def discover(keywords, exclude=None):
+    """input root me keyword-match karne wala pehla dataset dir return karo."""
+    exclude = exclude or []
+    best = None
+    for d in sorted(os.listdir(INPUT_ROOT)):
+        dl = d.lower()
+        if any(ex in dl for ex in exclude):
+            continue
+        if any(k in dl for k in keywords):
+            cand = os.path.join(INPUT_ROOT, d)
+            # andar images hone chahiye
+            found = False
+            for root, dirs, files in os.walk(cand):
+                if any(f.lower().endswith((".jpg", ".jpeg", ".png")) for f in files[:200]):
+                    found = True
+                    break
+            if found:
+                best = cand
+                break
+    return best
+
+FRACTURE_ROOT = discover(["fracture", "bone-fracture", "bone fracture", "x-ray-data"])
+BRAIN_ROOT    = discover(["brain-tumor", "brain tumor", "brainmri"], exclude=["kidney"])
+KIDNEY_ROOT   = discover(["kidney", "ct-kidney"], exclude=["brain"])
+
+print("FRACTURE_ROOT:", FRACTURE_ROOT)
+print("BRAIN_ROOT:   ", BRAIN_ROOT)
+print("KIDNEY_ROOT:  ", KIDNEY_ROOT)
+
+_missing = [n for n, r in [("fracture", FRACTURE_ROOT), ("brain", BRAIN_ROOT), ("kidney", KIDNEY_ROOT)] if r is None]
+if _missing:
+    print("\n❌ Ye datasets nahi mile:", _missing)
+    print("   Jo /kaggle/input me mojood hai wo ye hai:")
+    for d in sorted(os.listdir(INPUT_ROOT)):
+        print("     -", d)
+    raise RuntimeError(f"Datasets missing: {_missing} — upar wali list dekh kar sahi datasets Add Input se add karo.")
 
 OUT = "/kaggle/working/medai_v2"
 os.makedirs(f"{OUT}/metrics", exist_ok=True)
@@ -617,10 +664,11 @@ print(f"\n📦 Package: {zip_path}")
 print("   Ye file download karo (right panel → Output → medai_v2_package.zip)")
 print("   Isme: teeno .pth models + metrics/ + temperature.json + modality_gate.json")'''
 
-md_package = r"""## 📦 Ho gaya? Ab:
-1. Right panel → **Output** → `medai_v2_package.zip` **download** karo
-2. Zip mujhe do (ya extract karke files chat me paste karo / repo me daal do)
-3. Main backend me integrate karke test kar dunga — phir HF Spaces pe deploy
+md_package = r"""## 📦 Ho gaya? Ab files nikalo:
+1. Right panel → **Output** section → `/kaggle/working` folder kholo
+2. `medai_v2_package.zip` ke aage **download icon (⬇)** pe click karo
+   - Agar zip na dikhe: **Save Version** (top-right) dabao → **Save & Run All (Commit)** — run complete hone ke baad output files version me permanently aa jayengi, phir wahan se download hongi
+3. Zip mujhe do — main backend + HF Spaces pe deploy kar dunga
 
 ---
 **Agar koi cell fail ho:** error message mujhe dikha do — main fix karke updated notebook bana dunga."""

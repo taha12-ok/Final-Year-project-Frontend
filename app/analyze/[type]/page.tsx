@@ -34,7 +34,7 @@ const resultItem: Variants = {
 };
 
 // ── Backend URL from environment variable ──
-const BACKEND_URL = process.env.NEXT_PUBLIC_BACKEND_URL || "http://127.0.0.1:8000";
+const BACKEND_URL = process.env.NEXT_PUBLIC_BACKEND_URL || "https://tahashabbir-medai-backend.hf.space";
 
 /** URL query se patient prefill (assistant handoff) + concern note */
 function prefillFromQuery(): { patient: { name: string; age: string; gender: string; phone: string }; concern: string } {
@@ -71,7 +71,7 @@ export default function AnalyzePage() {
   const [concern,      setConcern]      = useState("");
   const [patient,      setPatient]      = useState({ name: "", age: "", gender: "", phone: "" });
 
-  // ── Assistant handoff prefill (sirf pehli mount pe) ──
+  // ── Assistant handoff prefill (first mount only) ──
   useEffect(() => {
     const { patient: p, concern: c } = prefillFromQuery();
     if (p.name || p.age || p.gender) setPatient((prev) => ({ ...prev, ...p, phone: prev.phone }));
@@ -133,11 +133,11 @@ export default function AnalyzePage() {
         const detail = apiDetail?.detail ?? apiDetail;
         if (detail && typeof detail === "object" && detail.error === "not_a_scan") {
           setNotScanWarn(true);
-          setErrorMsg(detail.message || "Yeh medical scan nahi lagti — proper X-ray/MRI/CT upload karein.");
+          setErrorMsg(detail.message || "This doesn't look like a medical scan — please upload a proper X-ray/MRI/CT image.");
         } else if (res.status === 429) {
-          setErrorMsg("Bohat zyada requests — ek minute baad try karein.");
+          setErrorMsg("Too many requests — please wait a minute and try again.");
         } else if (res.status === 413) {
-          setErrorMsg((typeof detail === "string" ? detail : null) || "File bohat bari hai (max 10 MB).");
+          setErrorMsg((typeof detail === "string" ? detail : null) || "File is too large (max 10 MB).");
         } else {
           setErrorMsg(
             (typeof detail === "string" && detail) ||
@@ -153,8 +153,8 @@ export default function AnalyzePage() {
     } catch (e: any) {
       setErrorMsg(
         "Backend se connect nahi ho paya. " +
-        "Agar locally chala rahe ho to backend start karo (uvicorn main:app --port 8000); " +
-        "deployed backend ka URL NEXT_PUBLIC_BACKEND_URL me set karo."
+        "Could not reach the backend. If running locally, start it with: uvicorn main:app --port 8000. " +
+        "Otherwise make sure NEXT_PUBLIC_BACKEND_URL points to your deployed backend."
       );
     } finally {
       setLoading(false);
@@ -188,7 +188,7 @@ export default function AnalyzePage() {
       a.href = url; a.download = `report_${patient.name}.pdf`; a.click();
       window.URL.revokeObjectURL(url);
     } catch (e: any) {
-      setErrorMsg(e.message || "PDF report generate nahi ho payi — dobara try karein.");
+      setErrorMsg(e.message || "PDF report failed — please try again.");
     } finally {
       setPdfLoading(false);
     }
@@ -428,7 +428,7 @@ export default function AnalyzePage() {
                 : <AlertTriangle size={18} style={{ color: "var(--alert)", flexShrink: 0, marginTop: 2 }} />}
               <div>
                 <p style={{ fontWeight: 700, fontSize: 13.5, color: notScanWarn ? "#d97706" : "var(--alert)", marginBottom: 3 }}>
-                  {notScanWarn ? "Yeh medical scan nahi lagti" : "Kuch masla hua"}
+                  {notScanWarn ? "This doesn't look like a medical scan" : "Something went wrong"}
                 </p>
                 <p style={{ fontSize: 12.5, color: "var(--body)", lineHeight: 1.6 }}>{errorMsg}</p>
               </div>

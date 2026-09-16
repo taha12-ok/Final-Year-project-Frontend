@@ -85,7 +85,7 @@ export default function AIDoctorPage() {
     {
       role: "assistant",
       content:
-        "Assalam-o-Alaikum! 👋 Main MedAI Health Assistant hoon.\n\nApni takleef batao — kya dard ya masla hai, kahan hai, aur kitne din se? Main aap ko behtar samajhne me madad karunga aur zaroorat pare to sahi screening ki taraf le jaunga.",
+        "Hello! 👋 I'm the MedAI Health Assistant.\n\nTell me what's bothering you — what pain or problem do you have, where is it, and how long has it been going on? I'll help you understand it and guide you to the right screening if needed.",
     },
   ]);
   const [input, setInput] = useState("");
@@ -167,7 +167,7 @@ export default function AIDoctorPage() {
       if (e.name === "AbortError") {
         setMessages((prev) => prev);
       } else {
-        setError(e.message || "Kuch ghalat ho gaya — dobara try karein.");
+        setError(e.message || "Something went wrong — please try again.");
         setMessages((prev) => {
           const next = [...prev];
           if (next[next.length - 1]?.content === "") next.pop();
@@ -186,7 +186,7 @@ export default function AIDoctorPage() {
       {
         role: "assistant",
         content:
-          "Assalam-o-Alaikum! 👋 Main MedAI Health Assistant hoon.\n\nApni takleef batao — kya dard ya masla hai, kahan hai, aur kitne din se? Main aap ko behtar samajhne me madad karunga aur zaroorat pare to sahi screening ki taraf le jaunga.",
+          "Hello! 👋 I'm the MedAI Health Assistant.\n\nTell me what's bothering you — what pain or problem do you have, where is it, and how long has it been going on? I'll help you understand it and guide you to the right screening if needed.",
       },
     ]);
     setError(null);
@@ -219,7 +219,7 @@ export default function AIDoctorPage() {
           AI Health <span className="gradient-text">Assistant</span>
         </h1>
         <p style={{ color: "var(--muted)", fontSize: 14.5, marginTop: 6 }}>
-          Apni takleef batao — main sawal samajh kar screening guide karunga. <span style={{ color: "var(--body)" }}>Roman Urdu / English dono chalenge.</span>
+          Tell me about your symptoms — I'll ask a few questions and guide you to the right screening. <span style={{ color: "var(--body)" }}>English or Roman Urdu, both work.</span>
         </p>
       </motion.div>
 
@@ -302,7 +302,7 @@ export default function AIDoctorPage() {
                         </motion.button>
                       </Link>
                       <p style={{ fontSize: 10.5, color: "var(--muted)", marginTop: 8 }}>
-                        Patient details auto-fill ho jayengi — scan upload karke turant analyze karo.
+                        Your patient details will be pre-filled — just upload the scan and analyze.
                       </p>
                     </motion.div>
                   )}
@@ -326,7 +326,7 @@ export default function AIDoctorPage() {
                 if (e.key === "Enter" && !e.shiftKey) { e.preventDefault(); send(); }
               }}
               rows={1}
-              placeholder="Apni takleef likho… (Enter to send)"
+              placeholder="Describe your symptoms… (Enter to send)"
               disabled={streaming}
               style={{
                 flex: 1, resize: "none", border: "1px solid var(--border-strong)", borderRadius: 14,
@@ -358,7 +358,7 @@ export default function AIDoctorPage() {
         <div style={{ marginTop: 14, padding: "12px 16px", background: "var(--violet-soft)", border: "1px solid rgba(124,92,252,0.28)", borderRadius: 14, display: "flex", gap: 9, alignItems: "flex-start" }}>
           <AlertTriangle size={15} style={{ color: "#5B3FE4", flexShrink: 0, marginTop: 2 }} />
           <p style={{ color: "#5B3FE4", fontSize: 12, lineHeight: 1.65 }}>
-            <strong>Medical Disclaimer:</strong> Ye AI assistant screening aid hai, diagnosis nahi. Emergency me (severe chest pain, saans ki takleef, behoshi) foran hospital jayen. Final hamesha qualified doctor se confirm karein.
+            <strong>Medical Disclaimer:</strong> This AI assistant is a screening aid, not a diagnosis. In an emergency (severe chest pain, difficulty breathing, fainting), go to the nearest hospital immediately. Always confirm with a qualified doctor.
           </p>
         </div>
       </div>

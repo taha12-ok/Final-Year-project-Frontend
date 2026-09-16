@@ -41,7 +41,7 @@ HANDOFF (very important)
 - In intermediate intake replies, do NOT append the handoff line.
 
 DISCLAIMER
-- End the assessment with: "Ye screening sirf educational aid hai, diagnosis nahi — final hamesha qualified doctor se confirm karein." (or the English equivalent if the user speaks English).`;
+- End the assessment with: "This screening is an educational aid, not a diagnosis — always confirm with a qualified doctor." (match the user's language: if they wrote Roman Urdu, you may append the Roman Urdu version "Ye screening sirf educational aid hai, diagnosis nahi — final hamesha qualified doctor se confirm karein.").`;
 
 function extractHandoff(text: string): { clean: string; handoff: Record<string, string> | null } {
   const idx = text.indexOf("###HANDOFF###");
@@ -110,7 +110,7 @@ export async function POST(req: NextRequest) {
       const errText = await groqRes.text().catch(() => "unknown error");
       console.error("Groq API error:", groqRes.status, errText);
       return new Response(
-        JSON.stringify({ error: `AI service error (${groqRes.status}). Thori dair baad try karein.` }),
+        JSON.stringify({ error: `AI service error (${groqRes.status}). Please try again in a moment.` }),
         { status: 502, headers: { "Content-Type": "application/json" } },
       );
     }
