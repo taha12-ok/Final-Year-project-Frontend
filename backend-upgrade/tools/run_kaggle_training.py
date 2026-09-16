@@ -86,7 +86,7 @@ def prepare_push_dir(username, slug):
         "kernel_type": "notebook",
         "is_private": True,
         "enable_gpu": True,
-        "enable_internet": False,  # datasets attached hain, internet ki zaroorat nahi
+        "enable_internet": True,  # ResNet50 pretrained ImageNet weights download karne ke liye zaroori
         "dataset_sources": DATASETS,
         "competition_sources": [],
         "kernel_sources": [],
