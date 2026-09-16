@@ -114,28 +114,14 @@ print("Config OK — epochs:", NUM_EPOCHS, "| batch:", BATCH_SIZE)'''
 # ─────────────────────────────────────────────────────────────
 # Cell 2 — dataset verification
 # ─────────────────────────────────────────────────────────────
-code_verify = r'''# ── Dataset paths verify karo (agar koi path galat ho to yahan pata chalega) ──
-def find_dir(base, keywords, max_depth=4):
-    """base ke andar keyword-wala pehla directory dhoondo (recursive)."""
-    hits = []
-    for root, dirs, files in os.walk(base):
-        depth = root[len(base):].count(os.sep)
-        if depth > max_depth: 
-            dirs[:] = []
-            continue
-        low = os.path.basename(root).lower()
-        if any(k in low for k in keywords):
-            hits.append(root)
-    return hits
-
+code_verify = r'''# ── Dataset paths verify karo (smart discovery ne pehle hi pakad liya) ──
 for name, root in [("FRACTURE", FRACTURE_ROOT), ("BRAIN", BRAIN_ROOT), ("KIDNEY", KIDNEY_ROOT)]:
-    if not os.path.exists(root):
-        print(f"⚠️ {name} dataset root nahi mila: {root}")
-        print("   Kaggle notebook me Add Input se dataset add karo (upar wali list).")
-    else:
+    if root and os.path.exists(root):
         subs = sorted(os.listdir(root))[:8]
         print(f"✅ {name}: {root}")
-        print(f"   Top-level: {subs}")'''
+        print(f"   Top-level: {subs}")
+    else:
+        print(f"⚠️ {name} root nahi mila: {root}")'''
 
 # ─────────────────────────────────────────────────────────────
 # Cell 3 — training engine
@@ -623,9 +609,61 @@ if len(np.unique(y)) == 2:
     print(f"✅ Modality gate saved (threshold {best_t:.2f}, F1 {best_f1:.4f})")'''
 
 # ─────────────────────────────────────────────────────────────
+# Cell 8.5 — ONNX export (free-tier deployment ke liye: Render 512MB)
+# ─────────────────────────────────────────────────────────────
+code_onnx = r'''# ── 5) ONNX EXPORT — lightweight deployment (Render free tier 512MB) ──
+# Har model ko ONNX me convert + dynamic int8 quantize karo.
+# Quantized ONNX ~24MB/model hota hai (94MB se neeche) aur CPU pe fast hai.
+import onnx
+from onnxruntime.quantization import quantize_dynamic, QuantType
+
+def export_onnx(name, num_classes):
+    print(f"\n⏳ Exporting {name} → ONNX...")
+    m = build_model(num_classes).to(DEVICE)
+    m.load_state_dict(torch.load(f"{OUT}/{name}_model.pth", map_location=DEVICE))
+    m.eval().to("cpu")  # ONNX export CPU pe
+
+    dummy = torch.randn(1, 3, 224, 224)
+    onnx_path = f"{OUT}/{name}_model.onnx"
+    torch.onnx.export(
+        m, dummy, onnx_path,
+        input_names=["input"], output_names=["logits"],
+        dynamic_axes={"input": {0: "batch"}, "logits": {0: "batch"}},
+        opset_version=13,
+    )
+    print(f"  ✅ {name}_model.onnx ({os.path.getsize(onnx_path)/1e6:.1f} MB)")
+
+    # Dynamic int8 quantization
+    q_path = f"{OUT}/{name}_model_int8.onnx"
+    quantize_dynamic(onnx_path, q_path, weight_type=QuantType.QInt8)
+    print(f"  ✅ {name}_model_int8.onnx ({os.path.getsize(q_path)/1e6:.1f} MB)")
+
+    # Sanity: ONNX runtime se output verify karo
+    import onnxruntime as ort
+    sess = ort.InferenceSession(q_path, providers=["CPUExecutionProvider"])
+    out = sess.run(None, {"input": dummy.numpy()})[0]
+    with torch.no_grad():
+        ref = m(dummy).numpy()
+    diff = float(abs(out - ref).max())
+    print(f"  🔍 max logit diff vs PyTorch: {diff:.4f} (<0.1 good)")
+
+    del m
+    torch.cuda.empty_cache() if DEVICE.type == "cuda" else None
+
+export_onnx("fracture", 2)
+export_onnx("brain", 4)
+export_onnx("kidney", 4)
+print("\n✅ All ONNX exports done — ye /kaggle/working/medai_v2/ me hain:")
+for f in sorted(os.listdir(OUT)):
+    if f.endswith(".onnx"):
+        print("   -", f)'''
+
+code_package_orig = None  # marker: original package cell niche hai
+
+# ─────────────────────────────────────────────────────────────
 # Cell 8 — package + report
 # ─────────────────────────────────────────────────────────────
-code_package = r'''# ── 5) FINAL REPORT + PACKAGE ──
+code_package = r'''# ── 6) FINAL REPORT + PACKAGE ──
 report_lines = ["="*62, "MedAI v2 RETRAINING REPORT", "="*62]
 temps = {}
 all_ok = True
@@ -661,8 +699,8 @@ with zipfile.ZipFile(zip_path, "w", zipfile.ZIP_DEFLATED) as zf:
             fp = os.path.join(root, file)
             zf.write(fp, os.path.relpath(fp, OUT))
 print(f"\n📦 Package: {zip_path}")
-print("   Ye file download karo (right panel → Output → medai_v2_package.zip)")
-print("   Isme: teeno .pth models + metrics/ + temperature.json + modality_gate.json")'''
+print("   Right panel → Output → /kaggle/working → medai_v2_package.zip → ⬇ download")
+print("   Isme: teeno .pth + teeno int8 .onnx + metrics/ + temperature.json + modality_gate.json")'''
 
 md_package = r"""## 📦 Ho gaya? Ab files nikalo:
 1. Right panel → **Output** section → `/kaggle/working` folder kholo
@@ -682,6 +720,7 @@ cells = [
     {"cell_type": "code", "metadata": {}, "execution_count": None, "outputs": [], "source": code_brain},
     {"cell_type": "code", "metadata": {}, "execution_count": None, "outputs": [], "source": code_kidney},
     {"cell_type": "code", "metadata": {}, "execution_count": None, "outputs": [], "source": code_gate},
+    {"cell_type": "code", "metadata": {}, "execution_count": None, "outputs": [], "source": code_onnx},
     {"cell_type": "code", "metadata": {}, "execution_count": None, "outputs": [], "source": code_package},
     {"cell_type": "markdown", "metadata": {}, "source": md_package},
 ]
