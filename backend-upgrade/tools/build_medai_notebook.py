@@ -58,6 +58,27 @@ if DEVICE.type != "cuda":
 
 INPUT_ROOT = "/kaggle/input"
 
+# Corrupt/truncated images datasets me common hain — crash ke bajaye load kar lo
+from PIL import ImageFile
+ImageFile.LOAD_TRUNCATED_IMAGES = True
+
+class SafeImageFolder(datasets.ImageFolder):
+    """Kharab image pe crash nahi — same class ki agli valid image return karta hai."""
+    def __getitem__(self, index):
+        try:
+            return super().__getitem__(index)
+        except Exception:
+            alt = (index + 1) % len(self)
+            for _ in range(5):
+                try:
+                    return super().__getitem__(alt)
+                except Exception:
+                    alt = (alt + 1) % len(self)
+            # last resort: blank image, apna hi label
+            img = Image.new("RGB", (224, 224))
+            tf = self.transform if self.transform else transforms.ToTensor()
+            return tf(img), self.targets[index]
+
 # ─────────────────────────────────────────────────────────────
 # SMART DATASET DISCOVERY (recursive) — Kaggle naya UI datasets ko
 # /kaggle/input/datasets/<owner>/<slug> me nest karta hai, isliye
@@ -167,10 +188,12 @@ if _missing:
     print("\n❌ Ye datasets download bhi nahi ho sake:", _missing)
     raise RuntimeError(f"Datasets missing: {_missing} — internet/kagglehub check karo ya Add Input se manually add karo.")
 
+datasets.ImageFolder = SafeImageFolder  # baaki sab code ko bhi safe bana do
+
 OUT = "/kaggle/working/medai_v2"
 os.makedirs(f"{OUT}/metrics", exist_ok=True)
 
-FAST_TEST = False   # sanity check ke liye True karo (1 epoch), phir False
+FAST_TEST = True   # <-- pehli baar True chalao (pipeline sanity, ~30 min); phir False karke full run
 NUM_EPOCHS = 1 if FAST_TEST else 14
 BATCH_SIZE = 16 if FAST_TEST else 64
 
