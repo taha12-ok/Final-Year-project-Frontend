@@ -7,3 +7,9 @@ build/
 .env.*.local
 tsconfig.tsbuildinfo
 .freebuff/
+
+# Kaggle API credentials & push artifacts (never commit!)
+kaggle.json
+.kaggle/
+docs/kaggle/kaggle_push/
+docs/kaggle/kaggle_output/
