@@ -1,100 +1,102 @@
-# 🚀 HF Spaces Deployment — Colab khatam, permanent backend (FREE)
+# 🚀 Backend Deployment — 100% FREE (Render free tier + ONNX)
 
-> **Kya milega:** 24/7 chalne wala backend URL — na Colab cell chalana, na ngrok, na har demo se pehle setup. Sab kuch **100% free** hai.
+> **Update:** HF Spaces ab Docker Spaces ke liye PRO maangta hai, isliye hum **Render.com free tier** pe deploy karte hain — ONNX engine ke sath (torch-free, 512MB RAM me fit, permanent URL).
 
----
+## Kaam kaise karta hai (dual engine)
 
-## Step 1 — HF Account + Token (5 min)
-
-1. **huggingface.co** → **Sign Up** (free, email se ho jata hai)
-2. Right-top profile photo → **Settings** → left me **Access Tokens**
-3. **Create new token**:
-   - Name: `medai-backend`
-   - Role/Permission: **Write**
-4. Token copy karo ( `hf_...` se start hota hai) — ye sirf push ke waqt chahiye
-
-## Step 2 — New Space banao (2 min)
-
-1. huggingface.co → **New → Space**
-2. **Space name:** `medai-backend`
-3. **SDK:** **Docker** → **Blank** template
-4. **Visibility:** **Public** (free CPU quota + Vercel se call ho sake; code public hoga — usme koi key nahi hai, models bhi publicly available datasets se trained hain — theek hai)
-5. **Create Space** → khali Space ban jayegi
-
-## Step 3 — Local machine pe backend repo ready karo
-
-```bash
-# 1. GitHub repo clone karo
-git clone https://github.com/taha12-ok/Final-Year-project-Backend.git
-cd Final-Year-project-Backend
-
-# 2. Backend-upgrade files copy karo (main ne ye folder bana rakha hai):
-#    Frontend repo ke andar: backend-upgrade/
-#    Copy: main.py, modality.py, calibration.py, requirements.txt, Dockerfile
-cp /c/Users/ESHOP/Desktop/Final\ Year\ Project\ FYP/backend-upgrade/main.py .
-cp /c/Users/ESHOP/Desktop/Final\ Year\ Project\ FYP/backend-upgrade/modality.py .
-cp /c/Users/ESHOP/Desktop/Final\ Year\ Project\ FYP/backend-upgrade/calibration.py .
-cp /c/Users/ESHOP/Desktop/Final\ Year\ Project\ FYP/backend-upgrade/requirements.txt .
-cp /c/Users/ESHOP/Desktop/Final\ Year\ Project\ FYP/backend-upgrade/Dockerfile .
-
-# 3. metrics folder banao (notebook ke outputs ke liye)
-mkdir -p metrics
-touch metrics/.gitkeep
-```
-
-> **Abhi (purane models ke saath bhi chalega)** — naye models notebook se aane ke baad bhi ye files replace ho jayengi (same names), to abhi push kar sakte ho.
-
-## Step 4 — HF Space me push karo
-
-```bash
-# HF Space ke remote ko add karo (username aur Space name apna dalna):
-git remote add space https://huggingface.co/spaces/YOUR_USERNAME/medai-backend
-
-# Push (username: $hf username, password: Step-1 wala token)
-git push space main --force
-```
-
-Push ke baad Space ke **Logs** tab me dekho:
-- `Installing requirements...` (~4-5 min, torch waghera)
-- `Loading fracture model... Loading brain model... Loading kidney model...`
-- Jab **`Running on http://0.0.0.0:8000`** aaye → **live!**
-
-Tumhara URL hoga: `https://YOUR_USERNAME-medai-backend.hf.space`
-
-**Turant test:**
-- `https://YOUR_USERNAME-medai-backend.hf.space/` → `{"message": "MedAI Screening API v2 ✅", ...}`
-- `/docs` → Swagger UI khud dekh lo
-
-## Step 5 — Vercel env update (2 min)
-
-1. vercel.com → project → **Settings → Environment Variables**
-2. `NEXT_PUBLIC_BACKEND_URL` = `https://YOUR_USERNAME-medai-backend.hf.space`
-3. **Redeploy** karo
-
-## Step 6 — Naye models (notebook ke baad)
-
-Kaggle notebook (`docs/kaggle/MedAI_Retraining.ipynb`) run karke `medai_v2_package.zip` milega:
-- `fracture_model.pth`, `brain_model.pth`, `kidney_model.pth` → repo root me daalo (purane replace)
-- `temperature.json` → repo root me
-- `modality_gate.json` → repo root me
-- `metrics/fracture.json`, `metrics/brain.json`, `metrics/kidney.json` → `metrics/` folder me
-- Phir dobara: `git add . && git commit -m "v2 models" && git push space main --force`
-
-Done! `/lab` page pe metrics live dikhne lagenge aur random-photo rejection active ho jayegi (trained gate).
+- Notebook ab har model ka **int8-quantized ONNX export** bhi banati hai (`*_model_int8.onnx`, ~24MB each)
+- Backend khud detect karta hai: ONNX files hon to **ONNX engine** (torch-free, chhota RAM) — warna PyTorch `.pth`
+- Heatmap: ONNX mode me **Activation Mapping** (Grad-CAM ka equivalent for ResNet) — viva me explain karne ke liye `docs/VIVA-QA.md` dekho
 
 ---
 
-## ⚠️ Zaroori notes
+## Step 1 — Kaggle notebook run karo (agar abhi tak nahi kiya)
 
-- **Sleep/timeout:** HF free Spaces ke free CPU pe **24/7 chalta hai**; 48h idle ke baad Space pause ho sakti hai — Space page pe jaake **Restart** karna hai (ya factory reset). Demo se pehle ek baar URL khol lena.
-- **Cold start:** Space restart ke baad pehli request pe models load hote hain (~1 min) — `PRELOAD_MODELS=1` isliye diya hai.
-- **CORS:** backend me `ALLOWED_ORIGINS` env me Vercel URL hai; HF pe default theek hai. Naya domain add karna ho to Space → Settings → Variables me `ALLOWED_ORIGINS` set karo.
-- **Model files bari hain (~94 MB each):** pehli push me thora time lagega. HF free LFS quota (50GB) me 3 models asani fit ho jate hain.
+1. kaggle.com → apni notebook → **File → Import Notebook** → `docs/kaggle/MedAI_Retraining.ipynb`
+2. Right panel → **Session options → Accelerator → GPU T4**
+3. **Add Input** → ye 3 datasets add karo (search by name):
+   - `Bone Fracture Multi-Region X-ray Data` (bmadushanirodrigo)
+   - `Brain Tumor MRI Dataset` (masoudnickparvar)
+   - `CT KIDNEY DATASET: Normal-Cyst-Tumor and Stone` (nazmul0087)
+   - **Bonus (gate ke liye):** koi bhi normal photos dataset — jaise `cats and dogs images classification`
+   - *Aur jo bhi 15 datasets tumne already add kiye hain — notebook keywords se khud sahi wali pakad legi*
+4. **Run All** → ~60-90 min → right panel Output → `/kaggle/working` → `medai_v2_package.zip` **⬇**
+
+## Step 2 — Backend repo me files daalo
+
+`medai_v2_package.zip` extract karo, aur ye files `FYP-backend` folder me copy karo (local: `C:\Users\ESHOP\Desktop\FYP-backend`):
+
+```
+fracture_model.pth, brain_model.pth, kidney_model.pth      → root
+fracture_model_int8.onnx, brain_model_int8.onnx, kidney_model_int8.onnx  → root
+temperature.json, modality_gate.json                        → root
+metrics/fracture.json, metrics/brain.json, metrics/kidney.json → metrics/
+```
+
+Phir push:
+```bash
+cd C:\Users\ESHOP\Desktop\FYP-backend
+git add .
+git commit -m "v2 models + ONNX + calibration"
+git push origin main
+```
+
+## Step 3 — Render pe deploy (free)
+
+1. **render.com** → GitHub se sign up/login
+2. **New + → Web Service**
+3. Tumhara repo connect karo: `taha12-ok/Final-Year-project-Backend`
+   - Agar repo list me na aaye: render.com dashboard → account settings → **GitHub permissions** me repo access grant karo
+4. Settings:
+   - **Name:** `medai-backend`
+   - **Region:** Singapore (Pakistan ke liye fastest)
+   - **Branch:** `main`
+   - **Runtime:** **Docker**
+   - **Dockerfile path:** `./Dockerfile.free`
+   - **Instance Type:** **Free**
+5. **Environment Variables** add karo:
+   - `ALLOWED_ORIGINS` = `https://final-year-project-medai.vercel.app,http://localhost:3000`
+   - `PRELOAD_MODELS` = `1`
+6. **Create Web Service** → build ~5-8 min → live!
+
+Tumhara URL: `https://medai-backend-XXXX.onrender.com` (Render dashboard pe dikhega)
+
+**Test:**
+- `https://<tumhara-url>/` → `{"message": "MedAI Screening API v2 ✅", ...}`
+- `https://<tumhara-url>/health` → `{"engine": "onnx", ...}` (agar ONNX models push kiye)
+
+## Step 4 — Vercel env update
+
+1. vercel.com → project → Settings → Environment Variables
+2. `NEXT_PUBLIC_BACKEND_URL` = `https://<tumhara-render-url>`
+3. Redeploy
+
+## Step 5 — Live verification
+
+1. Site kholo → kisi bhi screening pe real X-ray upload karo → result aana chahiye
+2. Random selfie upload karo → **"This doesn't look like a medical scan"** amber warning (modality gate working)
+3. `/lab` kholo → metrics dikhne lagenge (agar metrics/*.json push kiye)
+
+---
+
+## ⚠️ Free tier notes (Render)
+
+- **15 min idle ke baad service sleep** hoti hai — pehli request pe ~30-50 sec cold start. Demo se pehle ek baar URL khol lena (wake up ho jayegi).
+- **750 hours/month free** — ek service 24/7 ke liye kaafi hai.
+- Agar speed aur zimmedari barhani ho to $7/month starter tier bhi hai (optional, free zaroori nahi).
+
+## HF Spaces alternative (agar kabhi PRO le ho)
+
+HF ab Docker Spaces ke liye PRO maangta hai. PRO ho to:
+1. huggingface.co → New Space → SDK: **Docker** → name `medai-backend`
+2. Backend repo me: `git remote add space https://huggingface.co/spaces/tahashabbir/medai-backend`
+3. `git push space main --force` (token password me)
+4. Vercel env me HF URL dal do
 
 ## Checklist
-- [ ] HF account + write token
-- [ ] Space created (Docker, public)
-- [ ] Backend-upgrade files repo me copy + push
-- [ ] Space URL live check (`/` aur `/docs`)
+- [ ] Kaggle notebook run → package zip download
+- [ ] Backend repo me files copy + push
+- [ ] Render service create (Docker, Dockerfile.free, free tier)
+- [ ] `/` aur `/health` live check
 - [ ] Vercel `NEXT_PUBLIC_BACKEND_URL` update + redeploy
-- [ ] Website se ek scan analyze kar ke dekha ✅
+- [ ] Live site se scan analyze + selfie rejection test ✅
