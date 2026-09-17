@@ -1,6 +1,34 @@
-# 🚀 Backend Deployment — 100% FREE, no credit card (Back4App Containers)
+# 🚀 Backend Deployment — 100% FREE, no credit card
 
-> **Recommended: Back4App Containers.** GitHub login se deploy hota hai, **card bilkul nahi mangta**, free tier permanent hai (256MB RAM — humara ONNX backend iske liye optimize ho chuka hai: cv2-free stack + teeno int8 models + LRU memory cap).
+> ⚠️ **Zaroori baat:** Back4App Containers free plan ka URL **TEMPORARY hota hai (har deployment pe ~60 min zinda)** — screenshot pe "Temporary URL Active" banner isi liye hai. Permanent URL paid plan me hai.
+>
+> **Isliye final plan ye hai:**
+> - **Testing / aaj ka demo:** Back4App (pehle se deployed, live) ✅
+> - **Permanent (website hamesha live):** **Render.com Free instance** — card NAHI mangta (Free instance select karne pe), permanent URL milta hai, bas 15 min inactivity ke baad cold-start (~50s) hota hai
+
+## Current live URLs
+
+| Platform | URL | Note |
+|---|---|---|
+| Back4App (temporary) | `https://fypbackend-8wadjfi2.b4a.run` | ~60 min zinda, har deploy pe naya |
+| Render (permanent) | deploy karne ke baad milega | neeche steps |
+
+---
+
+## Render deploy — permanent URL (10 min, card nahi)
+
+1. **render.com** → Sign up with GitHub
+2. **New + → Web Service** → `taha12-ok/Final-Year-project-Backend` connect karo
+3. **⚠️ Instance Type: FREE (0.1 CPU / 512 MB) select karo — $0 wala.** (Paid/Starter select hua to card ka dialog khul jata hai — wo cancel karke Free chuno)
+4. Runtime: **Docker** → Dockerfile path: `./Dockerfile` (root wala free-tier hai)
+5. Environment variables:
+   - `PRELOAD_MODELS` = `1`
+   - `MAX_LOADED_MODELS` = `2` (Render 512MB pe `3` bhi kar sakte ho)
+   - `ORT_THREADS` = `1`
+6. **Create Web Service** → build ~5-8 min → permanent URL (e.g. `medai-backend.onrender.com`)
+7. **Vercel** → project → Settings → Environment Variables → `NEXT_PUBLIC_BACKEND_URL` = Render URL → **Redeploy**
+
+> Cold start: free instance 15 min idle ke baad so jata hai; pehli request ~50s leti hai, phir fast. Demo se pehle ek baar /health kholein — garam ho jayega.
 
 ## Kya deploy hoga
 
@@ -12,7 +40,7 @@
 
 ---
 
-## Deploy steps (10 min, card nahi chahiye)
+## Back4App deploy steps (testing ke liye — URL temporary rehta hai)
 
 ### Step 1 — Account
 1. https://www.back4app.com → **Sign up** → **Continue with GitHub**
@@ -41,10 +69,11 @@
 - Build logs me dikhega: pip install → models copy → uvicorn start
 - "Live" hone pe **URL milega** (e.g. `https://medai-backend-xxxx.b4a.run`)
 
-### Step 5 — Frontend connect
+### Step 5 — Frontend connect (temporary testing)
 1. **Vercel** → apna project → **Settings → Environment Variables**
 2. `NEXT_PUBLIC_BACKEND_URL` = Back4App ka URL (copy from Step 4)
 3. **Redeploy** karo frontend ka
+4. ⚠️ Har naye Back4App deploy ka naya temporary URL hoga — Vercel env update karna hoga. Permanent solution upar Render wala hai.
 
 ---
 
