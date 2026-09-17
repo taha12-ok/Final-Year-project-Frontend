@@ -9,7 +9,7 @@ import {
 import Navbar from "@/components/Navbar";
 import { EASE } from "@/components/Reveal";
 
-const BACKEND_URL = process.env.NEXT_PUBLIC_BACKEND_URL || "https://tahashabbir-medai-backend.hf.space";
+const BACKEND_URL = process.env.NEXT_PUBLIC_BACKEND_URL || "https://fypbackend-8wadjfi2.b4a.run";
 
 interface Metrics {
   available?: boolean;
@@ -242,7 +242,7 @@ export default function LabPage() {
           <div style={{ display: "flex", alignItems: "stretch", gap: 8, flexWrap: "wrap" }}>
             {[
               { icon: <Layers size={17} />, t: "1. Upload", d: "Scan image (validated, ≤10 MB)" },
-              { icon: <ShieldCheck size={17} />, t: "2. Modality Gate", d: "Scan hai ya photo? Reject here" },
+              { icon: <ShieldCheck size={17} />, t: "2. Modality Gate", d: "Scan or random photo? Rejected here" },
               { icon: <ScanEye size={17} />, t: "3. ResNet50", d: "Feature extraction + prediction" },
               { icon: <Gauge size={17} />, t: "4. Calibration", d: "Temperature-scaled confidence" },
               { icon: <FlaskConical size={17} />, t: "5. Grad-CAM", d: "AI ne kahan focus kiya" },

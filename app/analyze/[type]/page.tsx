@@ -34,7 +34,7 @@ const resultItem: Variants = {
 };
 
 // ── Backend URL from environment variable ──
-const BACKEND_URL = process.env.NEXT_PUBLIC_BACKEND_URL || "https://tahashabbir-medai-backend.hf.space";
+const BACKEND_URL = process.env.NEXT_PUBLIC_BACKEND_URL || "https://fypbackend-8wadjfi2.b4a.run";
 
 /** URL query se patient prefill (assistant handoff) + concern note */
 function prefillFromQuery(): { patient: { name: string; age: string; gender: string; phone: string }; concern: string } {
@@ -142,7 +142,7 @@ export default function AnalyzePage() {
           setErrorMsg(
             (typeof detail === "string" && detail) ||
             detail?.message ||
-            `Backend error (${res.status}). Check: backend chal raha hai? NEXT_PUBLIC_BACKEND_URL sahi hai?`
+            `Backend error (${res.status}). Check: is the backend running? Is NEXT_PUBLIC_BACKEND_URL correct?`
           );
         }
         return;
@@ -152,7 +152,6 @@ export default function AnalyzePage() {
       setResult(data);
     } catch (e: any) {
       setErrorMsg(
-        "Backend se connect nahi ho paya. " +
         "Could not reach the backend. If running locally, start it with: uvicorn main:app --port 8000. " +
         "Otherwise make sure NEXT_PUBLIC_BACKEND_URL points to your deployed backend."
       );
