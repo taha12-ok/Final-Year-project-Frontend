@@ -1,102 +1,82 @@
-# 🚀 Backend Deployment — 100% FREE (Render free tier + ONNX)
+# 🚀 Backend Deployment — 100% FREE, no credit card (Back4App Containers)
 
-> **Update:** HF Spaces ab Docker Spaces ke liye PRO maangta hai, isliye hum **Render.com free tier** pe deploy karte hain — ONNX engine ke sath (torch-free, 512MB RAM me fit, permanent URL).
+> **Recommended: Back4App Containers.** GitHub login se deploy hota hai, **card bilkul nahi mangta**, free tier permanent hai (256MB RAM — humara ONNX backend iske liye optimize ho chuka hai: cv2-free stack + teeno int8 models + LRU memory cap).
 
-## Kaam kaise karta hai (dual engine)
+## Kya deploy hoga
 
-- Notebook ab har model ka **int8-quantized ONNX export** bhi banati hai (`*_model_int8.onnx`, ~24MB each)
-- Backend khud detect karta hai: ONNX files hon to **ONNX engine** (torch-free, chhota RAM) — warna PyTorch `.pth`
-- Heatmap: ONNX mode me **Activation Mapping** (Grad-CAM ka equivalent for ResNet) — viva me explain karne ke liye `docs/VIVA-QA.md` dekho
+- ONNX engine (torch-free) — teeno **int8-quantized models** (~24MB each, 256MB RAM me fit)
+- LRU memory cap: 2 models loaded rehte hain, teesra demand pe swap (RAM kabhi OOM nahi hoti)
+- Heatmap: Activation Mapping (Grad-CAM equivalent for ResNet) — viva ke liye `docs/VIVA-QA.md`
+- Modality gate: photo aaye to reject (HTTP 422 `not_a_scan`)
+- Dynamic `PORT` — container platform khud set karta hai
 
 ---
 
-## Step 1 — Kaggle notebook run karo (agar abhi tak nahi kiya)
+## Deploy steps (10 min, card nahi chahiye)
 
-1. kaggle.com → apni notebook → **File → Import Notebook** → `docs/kaggle/MedAI_Retraining.ipynb`
-2. Right panel → **Session options → Accelerator → GPU T4**
-3. **Add Input** → ye 3 datasets add karo (search by name):
-   - `Bone Fracture Multi-Region X-ray Data` (bmadushanirodrigo)
-   - `Brain Tumor MRI Dataset` (masoudnickparvar)
-   - `CT KIDNEY DATASET: Normal-Cyst-Tumor and Stone` (nazmul0087)
-   - **Bonus (gate ke liye):** koi bhi normal photos dataset — jaise `cats and dogs images classification`
-   - *Aur jo bhi 15 datasets tumne already add kiye hain — notebook keywords se khud sahi wali pakad legi*
-4. **Run All** → ~60-90 min → right panel Output → `/kaggle/working` → `medai_v2_package.zip` **⬇**
+### Step 1 — Account
+1. https://www.back4app.com → **Sign up** → **Continue with GitHub**
+2. GitHub authorize karo (repo access permission dena)
 
-## Step 2 — Backend repo me files daalo
-
-`medai_v2_package.zip` extract karo, aur ye files `FYP-backend` folder me copy karo (local: `C:\Users\ESHOP\Desktop\FYP-backend`):
-
-```
-fracture_model.pth, brain_model.pth, kidney_model.pth      → root
-fracture_model_int8.onnx, brain_model_int8.onnx, kidney_model_int8.onnx  → root
-temperature.json, modality_gate.json                        → root
-metrics/fracture.json, metrics/brain.json, metrics/kidney.json → metrics/
-```
-
-Phir push:
-```bash
-cd C:\Users\ESHOP\Desktop\FYP-backend
-git add .
-git commit -m "v2 models + ONNX + calibration"
-git push origin main
-```
-
-## Step 3 — Render pe deploy (free)
-
-1. **render.com** → GitHub se sign up/login
-2. **New + → Web Service**
-3. Tumhara repo connect karo: `taha12-ok/Final-Year-project-Backend`
-   - Agar repo list me na aaye: render.com dashboard → account settings → **GitHub permissions** me repo access grant karo
-4. Settings:
-   - **Name:** `medai-backend`
-   - **Region:** Singapore (Pakistan ke liye fastest)
+### Step 2 — Deploy
+1. Dashboard → **Build an app** → **Containers** (ya "New Container App")
+2. **Import from GitHub** → repo select karo: `taha12-ok/Final-Year-project-Backend`
+   - Pehli dafa GitHub permission maang sakta hai — All repositories ya select karo
+3. Settings:
    - **Branch:** `main`
-   - **Runtime:** **Docker**
-   - **Dockerfile path:** `./Dockerfile.free`
-   - **Instance Type:** **Free**
-5. **Environment Variables** add karo:
-   - `ALLOWED_ORIGINS` = `https://final-year-project-medai.vercel.app,http://localhost:3000`
-   - `PRELOAD_MODELS` = `1`
-6. **Create Web Service** → build ~5-8 min → live!
+   - **Root directory:** *(khali chhodo — repo root)*
+   - **Dockerfile:** khali chhodo (root `Dockerfile` auto-detect hoga — wo already free-tier wala hai)
+4. **Create / Deploy** dabao
 
-Tumhara URL: `https://medai-backend-XXXX.onrender.com` (Render dashboard pe dikhega)
+### Step 3 — Environment variables (Deploy settings me)
+| Key | Value |
+|---|---|
+| `PRELOAD_MODELS` | `1` |
+| `MAX_LOADED_MODELS` | `2` |
+| `ORT_THREADS` | `1` |
 
-**Test:**
-- `https://<tumhara-url>/` → `{"message": "MedAI Screening API v2 ✅", ...}`
-- `https://<tumhara-url>/health` → `{"engine": "onnx", ...}` (agar ONNX models push kiye)
+> `PORT` Back4App khud inject karta hai — set karne ki zaroorat nahi.
 
-## Step 4 — Vercel env update
+### Step 4 — Wait for build (~5-8 min)
+- Build logs me dikhega: pip install → models copy → uvicorn start
+- "Live" hone pe **URL milega** (e.g. `https://medai-backend-xxxx.b4a.run`)
 
-1. vercel.com → project → Settings → Environment Variables
-2. `NEXT_PUBLIC_BACKEND_URL` = `https://<tumhara-render-url>`
-3. Redeploy
-
-## Step 5 — Live verification
-
-1. Site kholo → kisi bhi screening pe real X-ray upload karo → result aana chahiye
-2. Random selfie upload karo → **"This doesn't look like a medical scan"** amber warning (modality gate working)
-3. `/lab` kholo → metrics dikhne lagenge (agar metrics/*.json push kiye)
+### Step 5 — Frontend connect
+1. **Vercel** → apna project → **Settings → Environment Variables**
+2. `NEXT_PUBLIC_BACKEND_URL` = Back4App ka URL (copy from Step 4)
+3. **Redeploy** karo frontend ka
 
 ---
 
-## ⚠️ Free tier notes (Render)
+## Test checklist (deploy ke baad)
 
-- **15 min idle ke baad service sleep** hoti hai — pehli request pe ~30-50 sec cold start. Demo se pehle ek baar URL khol lena (wake up ho jayegi).
-- **750 hours/month free** — ek service 24/7 ke liye kaafi hai.
-- Agar speed aur zimmedari barhani ho to $7/month starter tier bhi hai (optional, free zaroori nahi).
+```bash
+# Health
+curl https://YOUR-APP.b4a.run/health
 
-## HF Spaces alternative (agar kabhi PRO le ho)
+# Fracture X-ray test (t_fracture.jpg = koi X-ray image)
+curl -X POST https://YOUR-APP.b4a.run/predict/fracture -F "file=@t_fracture.jpg"
 
-HF ab Docker Spaces ke liye PRO maangta hai. PRO ho to:
-1. huggingface.co → New Space → SDK: **Docker** → name `medai-backend`
-2. Backend repo me: `git remote add space https://huggingface.co/spaces/tahashabbir/medai-backend`
-3. `git push space main --force` (token password me)
-4. Vercel env me HF URL dal do
+# Random photo reject hona chahiye (HTTP 422)
+curl -X POST https://YOUR-APP.b4a.run/predict/brain -F "file=@random_photo.jpg"
+```
 
-## Checklist
-- [ ] Kaggle notebook run → package zip download
-- [ ] Backend repo me files copy + push
-- [ ] Render service create (Docker, Dockerfile.free, free tier)
-- [ ] `/` aur `/health` live check
-- [ ] Vercel `NEXT_PUBLIC_BACKEND_URL` update + redeploy
-- [ ] Live site se scan analyze + selfie rejection test ✅
+Expected: `confidence`, `modality_gate.score > 0.5`, `gradcam_image` (base64) — random photo pe `not_a_scan` error.
+
+---
+
+## Agar Back4App kaam na kare — backup: Render (free, card nahi)
+
+1. render.com → **New Web Service** → GitHub repo
+2. Runtime: **Docker** → Instance Type: **Free** (dhyan se $0 wala — paid select hua to card dialog khul jata hai)
+3. Env vars same as Step 3
+4. Dockerfile path: `./Dockerfile.free` (agar root Dockerfile auto-detect na ho)
+
+---
+
+## Local test (deploy se pehle verify)
+
+```bash
+PRELOAD_MODELS=1 MAX_LOADED_MODELS=2 ORT_THREADS=1 uvicorn main:app --port 8000
+# Teen predictions + 1 random-photo-reject + PDF report test karo
+```
