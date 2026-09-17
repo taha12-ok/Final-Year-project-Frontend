@@ -13,3 +13,5 @@ kaggle.json
 .kaggle/
 docs/kaggle/kaggle_push/
 docs/kaggle/kaggle_output/
+backend-upgrade/onnx_out/
+__pycache__/

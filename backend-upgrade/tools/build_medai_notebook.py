@@ -756,18 +756,42 @@ def export_onnx(name, num_classes):
 
         dummy = torch.randn(1, 3, 224, 224)
         onnx_path = f"{OUT}/{name}_model.onnx"
-        torch.onnx.export(
-            m, dummy, onnx_path,
-            input_names=["input"], output_names=["logits"],
-            dynamic_axes={"input": {0: "batch"}, "logits": {0: "batch"}},
-            opset_version=13,
-            do_constant_folding=False,
-        )
+        # dynamo=False -> legacy exporter: single-file ONNX (naya torch external .data
+        # likhta hai jis se quantize_dynamic fail hota hai). Purane torch ke liye fallback.
+        try:
+            torch.onnx.export(
+                m, dummy, onnx_path,
+                input_names=["input"], output_names=["logits"],
+                dynamic_axes={"input": {0: "batch"}, "logits": {0: "batch"}},
+                opset_version=13,
+                do_constant_folding=False,
+                dynamo=False,
+            )
+        except TypeError:
+            torch.onnx.export(
+                m, dummy, onnx_path,
+                input_names=["input"], output_names=["logits"],
+                dynamic_axes={"input": {0: "batch"}, "logits": {0: "batch"}},
+                opset_version=13,
+                do_constant_folding=False,
+            )
         print(f"  ✅ {name}_model.onnx ({os.path.getsize(onnx_path)/1e6:.1f} MB)")
 
+        # fc weights ko .npy sidecar me export karo (backend ONNX engine ke
+        # Grad-CAM/Activation-Mapping ke liye — int8 graph me fc extract nahi hota)
+        import numpy as _np
+        _np.save(f"{OUT}/{name}_fc.npy", m.fc.weight.detach().cpu().numpy().astype(_np.float32))
+        print(f"  ✅ {name}_fc.npy (fc weights for activation mapping)")
+
         q_path = f"{OUT}/{name}_model_int8.onnx"
-        quantize_dynamic(onnx_path, q_path, weight_type=QuantType.QInt8)
-        print(f"  ✅ {name}_model_int8.onnx ({os.path.getsize(q_path)/1e6:.1f} MB)")
+        try:
+            try:
+                quantize_dynamic(onnx_path, q_path, weight_type=QuantType.QInt8, per_channel=True)
+            except TypeError:
+                quantize_dynamic(onnx_path, q_path, weight_type=QuantType.QInt8)
+            print(f"  ✅ {name}_model_int8.onnx ({os.path.getsize(q_path)/1e6:.1f} MB)")
+        except Exception as e:
+            print(f"  ⚠️ int8 quantize fail ({e}) — fp32 .onnx use hogi")
 
         import onnxruntime as ort
         sess = ort.InferenceSession(q_path, providers=["CPUExecutionProvider"])
