@@ -831,7 +831,10 @@ code_onnx = r'''# ── 5) ONNX EXPORT — free hosting (Render 512MB) ke liye 
 # NOTE: Ye cell FAIL hone par bhi package cell chalega (models .pth me safe hain).
 import subprocess, sys as _sys
 print("onnxruntime install ho raha hai...")
-subprocess.run([_sys.executable, "-m", "pip", "install", "-q", "onnxruntime==1.17.0", "onnx==1.15.0"], check=False)
+# Version backend requirements se match (1.24.4 — int8 ConvInteger support + numpy-2 compat).
+# numpy<2 pin bhi zaroori: Kaggle images ab numpy-2 ke sath aate hain aur purane
+# onnx/onnxruntime wheels _ARRAY_API error dete hain.
+subprocess.run([_sys.executable, "-m", "pip", "install", "-q", "onnxruntime==1.24.4", "onnx==1.16.2", "numpy<2"], check=False)
 try:
     import onnx
     from onnxruntime.quantization import quantize_dynamic, QuantType
@@ -1133,6 +1136,11 @@ nb = {
 
 os.makedirs("docs/kaggle", exist_ok=True)
 out_path = "docs/kaggle/MedAI_Retraining.ipynb"
+# NOTE: ye path REPO ROOT se resolve hota hai — builder hamesha repo root se chalao:
+#   python backend-upgrade/tools/build_medai_notebook.py
+if not os.path.exists("backend-upgrade") and os.path.basename(os.getcwd()) == "tools":
+    os.makedirs("../../docs/kaggle", exist_ok=True)
+    out_path = "../../docs/kaggle/MedAI_Retraining.ipynb"
 with open(out_path, "w", encoding="utf-8") as f:
     json.dump(nb, f, indent=1, ensure_ascii=False)
 print(f"✅ Notebook written: {out_path}")

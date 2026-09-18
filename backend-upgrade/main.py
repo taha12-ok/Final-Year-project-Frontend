@@ -37,6 +37,10 @@ from PIL import Image, ImageFile
 import numpy as np
 
 from modality import check_image
+from scan_type_classifier import classify_scan_type, MIN_CONFIDENCE as MIN_CLASSIFIER_CONFIDENCE
+
+# model_type -> CNN modality label (scan_type_classifier.CLASSES)
+MODEL_MODALITY = {"fracture": "xray", "brain": "mri", "kidney": "ct"}
 from calibration import get_temperature, calibrated_softmax, evaluate_confidence
 
 # ── Engine selection: ONNX (torch-free) ya PyTorch ──
@@ -75,6 +79,12 @@ ImageFile.LOAD_TRUNCATED_IMAGES = True
 # Config
 # ─────────────────────────────────────────────────────────────
 BASE_DIR = os.path.dirname(os.path.abspath(__file__))
+
+# Inconclusive band: is se neeche confidence pe backend "uncertain" flag deta hai.
+# OOD (bahar ki) images pe model overconfident hota hai — ye honest uncertainty
+# ke liye zaroori hai (MURA val eval: normals ab sahi, lekin confidence high hoti
+# hai — demo me "99% sure galat jawab" se bachne ke liye band rakha gaya hai).
+INCONCLUSIVE_BELOW = float(os.getenv("INCONCLUSIVE_BELOW", "60"))
 if not USE_ONNX:
     DEVICE = torch.device("cuda" if torch.cuda.is_available() else "cpu")
 else:
@@ -103,6 +113,7 @@ if USE_ONNX:
             "classes": onnx_engine.MODELS[k]["classes"],
             "scan": onnx_engine.MODELS[k]["scan"],
             "num_classes": onnx_engine.MODELS[k]["num_classes"],
+            "modality": MODEL_MODALITY.get(k),
             "model": None,
         }
         for k in onnx_engine.MODELS
@@ -168,6 +179,7 @@ if not USE_ONNX:
             "classes": ["Fractured", "Not Fractured"],
             "scan": "X-ray",
             "num_classes": 2,
+            "modality": "xray",
             "model": None,
         },
         "brain": {
@@ -175,6 +187,7 @@ if not USE_ONNX:
             "classes": ["Glioma", "Meningioma", "No Tumor", "Pituitary"],
             "scan": "Brain MRI",
             "num_classes": 4,
+            "modality": "mri",
             "model": None,
         },
         "kidney": {
@@ -182,6 +195,7 @@ if not USE_ONNX:
             "classes": ["Cyst", "Normal", "Stone", "Tumor"],
             "scan": "CT Scan",
             "num_classes": 4,
+            "modality": "ct",
             "model": None,
         },
     }
@@ -303,17 +317,54 @@ async def predict(model_type: str, file: UploadFile = File(...)):
     entry = MODELS[model_type]
     image = read_upload_image(file)
 
-    # ── GATE 1: kya ye sach me medical scan hai? ──
-    gate = check_image(image)
-    if not gate["passed"]:
-        raise HTTPException(
-            422,
-            detail={
-                "error": "not_a_scan",
-                "message": gate["reason"],
-                "gate": {"score": gate["score"], "source": gate["source"]},
-            },
-        )
+    # ── GATE 1: kya ye sach me medical scan hai? (CNN classifier, fallback: heuristics) ──
+    scan_cls = classify_scan_type(image)
+    if scan_cls.get("available"):
+        label = scan_cls["label"]
+        if label in ("photo", "other") or (
+            label == "unknown" and scan_cls["confidence"] < MIN_CLASSIFIER_CONFIDENCE
+        ):
+            raise HTTPException(
+                422,
+                detail={
+                    "error": "not_a_scan",
+                    "message": (
+                        "This image does not look like a medical scan. "
+                        "Please upload an X-ray, MRI, or CT scan image."
+                    ),
+                    "gate": {"score": scan_cls["confidence"], "source": "cnn_classifier"},
+                },
+            )
+        # ── GATE 1b: scan-type model se match karta hai? ──
+        expected = entry.get("modality")  # fracture->xray, brain->mri, kidney->ct
+        if expected and label != expected and scan_cls["confidence"] >= 0.75:
+            raise HTTPException(
+                422,
+                detail={
+                    "error": "scan_type_mismatch",
+                    "message": (
+                        f"This looks like a {label.upper()} image, but the "
+                        f"{entry['scan']} analyzer was selected. Please switch to the "
+                        f"correct analyzer or upload a {entry['scan']} image."
+                    ),
+                    "detected": label,
+                    "expected": expected,
+                    "gate": {"score": scan_cls["confidence"], "source": "cnn_classifier"},
+                },
+            )
+        gate = {"passed": True, "score": round(scan_cls["confidence"], 4), "source": "cnn_classifier"}
+    else:
+        # fallback: purana heuristic gate (jab CNN weights mojood na hon)
+        gate = check_image(image)
+        if not gate["passed"]:
+            raise HTTPException(
+                422,
+                detail={
+                    "error": "not_a_scan",
+                    "message": gate["reason"],
+                    "gate": {"score": gate["score"], "source": gate["source"]},
+                },
+            )
 
     # ── GATE 2: calibrated confidence ──
     temperature = get_temperature(model_type)
@@ -335,6 +386,17 @@ async def predict(model_type: str, file: UploadFile = File(...)):
             for i in order[1:4]
         ]
         reliability = evaluate_confidence(confidence)
+        # env-override (INCONCLUSIVE_BELOW) calibration ke 60 default ko replace kare
+        if INCONCLUSIVE_BELOW > 60 and confidence < INCONCLUSIVE_BELOW and not reliability.get("inconclusive"):
+            reliability = {
+                "status": "inconclusive",
+                "inconclusive": True,
+                "message": (
+                    "Model is not confident enough for a reliable screening result. "
+                    "Please try a clearer, properly-exposed scan image — "
+                    "and confirm with a qualified doctor regardless."
+                ),
+            }
     else:
         m = get_model(model_type)
         predicted, confidence, gradcam, alternatives, reliability, temperature = \
