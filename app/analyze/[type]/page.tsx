@@ -134,6 +134,14 @@ export default function AnalyzePage() {
         if (detail && typeof detail === "object" && detail.error === "not_a_scan") {
           setNotScanWarn(true);
           setErrorMsg(detail.message || "This doesn't look like a medical scan — please upload a proper X-ray/MRI/CT image.");
+        } else if (detail && typeof detail === "object" && detail.error === "scan_type_mismatch") {
+          setNotScanWarn(true);
+          const detected = String(detail.detected || "").toUpperCase();
+          const expected = String(detail.expected || "").toUpperCase();
+          setErrorMsg(
+            detail.message ||
+            `This looks like a ${detected} image, but the ${expected} analyzer is selected. Please use the correct analyzer from the top-right dropdown.`
+          );
         } else if (res.status === 429) {
           setErrorMsg("Too many requests — please wait a minute and try again.");
         } else if (res.status === 413) {

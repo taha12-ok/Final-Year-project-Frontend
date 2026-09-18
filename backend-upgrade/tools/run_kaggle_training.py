@@ -27,6 +27,8 @@ DATASETS = [
     "bmadushanirodrigo/fracture-multi-region-x-ray-data",
     "masoudnickparvar/brain-tumor-mri-dataset",
     "nazmul0087/ct-kidney-dataset-normal-cyst-tumor-and-stone",
+    "cjinny/mura-v11",        # v3: real normal X-rays (fracture negatives)
+    "koryakinp/fingers",      # v3: photo class (scan-type CNN)
 ]
 
 POLL_SECONDS = 120
@@ -80,7 +82,7 @@ def prepare_push_dir(username, slug):
     shutil.copy(NOTEBOOK, os.path.join(push_dir, "MedAI_Retraining.ipynb"))
     meta = {
         "id": f"{username}/{slug}",
-        "title": "MedAI Retraining v2",
+        "title": "MedAI Retraining v3",
         "code_file": "MedAI_Retraining.ipynb",
         "language": "python",
         "kernel_type": "notebook",
@@ -112,7 +114,7 @@ def main():
     ap.add_argument("--token", help="KGAT api token (ya pehle se saved use hoga)")
     ap.add_argument("--kaggle-json", help="old-style kaggle.json path")
     ap.add_argument("--username", default="tahashabbir321")
-    ap.add_argument("--slug", default="medai-retraining-v2")
+    ap.add_argument("--slug", default="medai-retraining-v3")
     ap.add_argument("--push-only", action="store_true", help="push karke ruk jao")
     ap.add_argument("--skip-push", action="store_true", help="sirf poll + download")
     args = ap.parse_args()

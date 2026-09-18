@@ -178,6 +178,32 @@ if not _ok_brain(BRAIN_ROOT):
 if not _ok_kidney(KIDNEY_ROOT):
     KIDNEY_ROOT = kagglehub_download("nazmul0087/ct-kidney-dataset-normal-cyst-tumor-and-stone")
 
+# v3: MURA (real normal X-rays — fracture negatives) + fingers (photos) —
+# fracture retrain ke liye normals + scan-type CNN ke liye photo class
+def _ok_mura(root):
+    if not root: return False
+    for dp in _all_dirs(root, max_depth=4):
+        if os.path.basename(dp) == "train":
+            subs = os.listdir(dp)
+            if any(s.startswith("XR_") for s in subs[:30]):
+                return True
+    return False
+
+MURA_ROOT   = find_dataset(["mura-v1", "mura_v1", "mura"], prefer={"train"})
+PHOTOS_ROOT = find_dataset(["fingers"], prefer={"fingers"})
+if not _ok_mura(MURA_ROOT):
+    try:
+        MURA_ROOT = kagglehub_download("cjinny/mura-v11")
+    except Exception as e:
+        print("\u26a0️ MURA auto-download fail (optional):", e); MURA_ROOT = None
+if PHOTOS_ROOT is None or not _has_images(PHOTOS_ROOT):
+    try:
+        PHOTOS_ROOT = kagglehub_download("koryakinp/fingers")
+    except Exception as e:
+        print("\u26a0️ fingers auto-download fail (optional):", e); PHOTOS_ROOT = None
+print("MURA_ROOT:  ", MURA_ROOT)
+print("PHOTOS_ROOT:", PHOTOS_ROOT)
+
 print("\nFinal roots:")
 print("  FRACTURE_ROOT:", FRACTURE_ROOT)
 print("  BRAIN_ROOT:   ", BRAIN_ROOT)
@@ -225,7 +251,7 @@ code_engine = r'''# ── Training engine: shared functions (teeno models ke li
 from collections import Counter
 from sklearn.metrics import confusion_matrix, classification_report, f1_score
 from sklearn.model_selection import train_test_split
-from torch.utils.data import Subset
+from torch.utils.data import Subset, ConcatDataset
 
 IMAGENET_MEAN = [0.485, 0.456, 0.406]
 IMAGENET_STD  = [0.229, 0.224, 0.225]
@@ -268,8 +294,14 @@ def train_one(name, train_ds, val_ds, num_classes, class_names, epochs):
     print(f"\n{'='*60}\n🏋️ TRAINING: {name.upper()}  ({len(train_ds)} train / {len(val_ds)} val)\n{'='*60}")
 
     def _targets(ds):
+        if isinstance(ds, ConcatDataset):
+            out = []
+            for d in ds.datasets:
+                out.extend(_targets(d))
+            return out
         if isinstance(ds, Subset):
-            return [ds.dataset.targets[i] for i in ds.indices]
+            base = _targets(ds.dataset)
+            return [base[i] for i in ds.indices]
         return ds.targets
     counts = Counter(_targets(train_ds))
     total = sum(counts.values())
@@ -468,7 +500,74 @@ else:
     fr_val   = datasets.ImageFolder(fr_val_root, transform=eval_tf)
 fr_test = datasets.ImageFolder(fr_test_root, transform=eval_tf)
 
-fr_metrics = train_one("fracture", fr_train, fr_val, 2, fr_train_full.classes, NUM_EPOCHS)
+# ── v3: MURA se REAL normal X-rays + extra positives (OOD fix ka core) ──
+# Purane model ki sab se bari kami: 'Not Fractured' class sirf is dataset ke
+# normal hands thi. MURA musk-skeleton X-rays (wrist/hand/finger/elbow/shoulder)
+# radiologist-confirmed hain — is se negative class diverse banti hai.
+fr_train_parts = [fr_train]
+mura_neg = mura_pos = 0
+if MURA_ROOT:
+    class ListImageDS(torch.utils.data.Dataset):
+        """Flat path-list dataset with .targets (train_one ke class-weights ke liye)."""
+        def __init__(self, paths, label, transform):
+            self.paths, self.label, self.transform = paths, label, transform
+        def __len__(self):
+            return len(self.paths)
+        def __getitem__(self, i):
+            try:
+                im = Image.open(self.paths[i]).convert("RGB")
+            except Exception:
+                im = Image.new("RGB", (224, 224))
+            return self.transform(im), self.label
+        @property
+        def targets(self):
+            return [self.label] * len(self.paths)
+
+    # MURA train folder dhoondo (XR_* subdirs)
+    mura_train = None
+    for dp in _all_dirs(MURA_ROOT, max_depth=5):
+        if os.path.basename(dp) == "train" and any(
+            s.startswith("XR_") for s in os.listdir(dp)[:40] if os.path.isdir(os.path.join(dp, s))
+        ):
+            mura_train = dp
+            break
+    if mura_train:
+        neg_if_idx = [k for k, v in fr_ifmap.items() if v == 1]  # 'Not Fractured' IF-index
+        pos_if_idx = [k for k, v in fr_ifmap.items() if v == 0]
+        if neg_if_idx and pos_if_idx:
+            neg_paths, pos_paths = [], []
+            CAP_NEG, CAP_POS = 3500, 1200
+            for dp, _, fs in os.walk(mura_train):
+                is_pos = dp.lower().rstrip("/").endswith("_positive")
+                is_neg = dp.lower().rstrip("/").endswith("_negative")
+                if not (is_pos or is_neg):
+                    continue
+                for f in fs:
+                    if not f.lower().endswith((".png", ".jpg", ".jpeg")):
+                        continue
+                    p = os.path.join(dp, f)
+                    if is_neg and len(neg_paths) < CAP_NEG:
+                        neg_paths.append(p)
+                    elif is_pos and len(pos_paths) < CAP_POS:
+                        pos_paths.append(p)
+                if len(neg_paths) >= CAP_NEG and len(pos_paths) >= CAP_POS:
+                    break
+            random.shuffle(neg_paths); random.shuffle(pos_paths)
+            # wrist/hand pehle (hand X-rays jo user dalta hai)
+            mura_neg, mura_pos = len(neg_paths), len(pos_paths)
+            if neg_paths:
+                fr_train_parts.append(ListImageDS(neg_paths, neg_if_idx[0], train_tf))
+            if pos_paths:
+                fr_train_parts.append(ListImageDS(pos_paths, pos_if_idx[0], train_tf))
+            print(f"MURA extra: {mura_neg} negatives + {mura_pos} positives")
+    else:
+        print("⚠️ MURA train folder nahi mila — negatives skip")
+else:
+    print("⚠️ MURA dataset nahi mila — SIRF dataset ke normals se train hoga (OOD risk)")
+
+fr_train_final = fr_train_parts[0] if len(fr_train_parts) == 1 else ConcatDataset(fr_train_parts)
+
+fr_metrics = train_one("fracture", fr_train_final, fr_val, 2, fr_train_full.classes, NUM_EPOCHS)
 
 # Test eval PEHLE (model + labels dono ImageFolder order me) — scalar accuracy order-independent hai
 fr_test_acc = eval_test_acc("fracture", 2, fr_test)
@@ -854,6 +953,150 @@ print(f"\n📦 Package: {zip_path} ({os.path.getsize(zip_path)/1e6:.1f} MB)")
 print("   Isme: teeno .pth + teeno int8 .onnx + metrics/ + temperature.json + modality_gate.json")
 print("   ⬇ Download: Save Version → Save & Run All (Commit) → phir Output panel se download")'''
 
+# ─────────────────────────────────────────────────────────────
+# Cell 7b — scan-type CNN (v3): xray/mri/ct/photo/other
+# ─────────────────────────────────────────────────────────────
+code_scan_cnn = r'''# ── 4b) SCAN-TYPE CNN — modality classifier (X-ray / MRI / CT / photo / other) ──
+# Backend me ye image ka scan-type detect karta hai:
+#   photo/other => 422 reject, galat model (e.g. MRI ko fracture) => 422 mismatch
+# Tiny CNN (~24k params) — weights JSON me export hote hain, backend numpy-only
+# inference karta hai (koi torch dependency nahi). ~10-12 min GPU pe.
+import base64 as _b64, torch.nn as _nn
+from torch.utils.data import Dataset as _DS, DataLoader as _DL
+
+CNN_SIZE, CNN_CLASSES = 128, ["xray", "mri", "ct", "photo", "other"]
+
+class _ListDS(_DS):
+    def __init__(self, items):
+        self.items = items  # (path_or_None, class_idx)
+    def __len__(self):
+        return len(self.items)
+    def __getitem__(self, i):
+        p, ci = self.items[i]
+        if p is None:
+            im = _synthetic_doc()
+        else:
+            try:
+                im = Image.open(p).convert("L")
+            except Exception:
+                im = Image.new("L", (CNN_SIZE, CNN_SIZE))
+        im = im.resize((CNN_SIZE, CNN_SIZE), Image.BILINEAR)
+        a = np.asarray(im, dtype=np.float32) / 255.0
+        a = (a - 0.5) / 0.5
+        if random.random() < 0.5:
+            a = a[:, ::-1]
+        if random.random() < 0.5:
+            a = a + random.uniform(-0.08, 0.08)
+        return torch.from_numpy(np.ascontiguousarray(a[None])), ci
+
+from PIL import ImageDraw, ImageFilter
+def _synthetic_doc():
+    """Random document/diagram/screenshot — 'other' class ke liye."""
+    W = random.randint(200, 800); H = random.randint(200, 800)
+    bg = random.choice([255, 248, 250, 252])
+    im = Image.new("RGB", (W, H), (bg, bg, bg))
+    d = ImageDraw.Draw(im)
+    for _ in range(random.randint(3, 15)):
+        kind = random.choice(["line", "rect", "text", "circle"])
+        x1, y1 = random.randint(0, max(W-10,1)), random.randint(0, max(H-10,1))
+        x2, y2 = x1 + random.randint(10, W//2), y1 + random.randint(10, H//2)
+        c = random.randint(0, 120)
+        if kind == "line":
+            d.line([x1, y1, x2, y2], fill=(c, c, c), width=random.randint(1, 4))
+        elif kind == "rect":
+            d.rectangle([x1, y1, x2, y2], outline=(c, c, c), width=random.randint(1, 3))
+        elif kind == "circle":
+            r = random.randint(10, 80)
+            d.ellipse([x1, y1, x1+r, y1+r], outline=(c, c, c), width=random.randint(1, 3))
+        else:
+            d.text((x1, y1), "Lorem ipsum " * random.randint(1, 4), fill=(c, c, c))
+    if random.random() < 0.5:
+        im = im.filter(ImageFilter.GaussianBlur(random.uniform(0.3, 1.2)))
+    return im.convert("L")
+
+class _TinyCNN(_nn.Module):
+    def __init__(self, n=5):
+        super().__init__()
+        self.conv1 = _nn.Conv2d(1, 8, 3, stride=2)
+        self.conv2 = _nn.Conv2d(8, 16, 3, stride=2)
+        self.conv3 = _nn.Conv2d(16, 32, 3, stride=2)
+        self.fc = _nn.Linear(32, n)
+    def forward(self, x):
+        x = torch.relu(self.conv1(x))
+        x = torch.relu(self.conv2(x))
+        x = torch.relu(self.conv3(x))
+        x = x.mean(dim=(2, 3))
+        return self.fc(x)
+
+def _collect(root, limit):
+    if root is None: return []
+    out = []
+    for dp, _, fs in os.walk(root):
+        for f in fs:
+            if f.lower().endswith((".jpg", ".jpeg", ".png", ".bmp")):
+                out.append(os.path.join(dp, f))
+                if len(out) >= limit: return out
+    return out
+
+def _balanced_cap(paths, cap):
+    paths = list(paths)
+    random.shuffle(paths)
+    return paths[:cap]
+
+CAP = 4000
+cls_paths = {
+    "xray":  _collect(FRACTURE_ROOT, CAP) + _collect(MURA_ROOT, CAP),
+    "mri":   _collect(BRAIN_ROOT, CAP),
+    "ct":    _collect(KIDNEY_ROOT, CAP),
+    "photo": _collect(PHOTOS_ROOT, CAP),
+    "other": [None] * CAP,   # synthetic
+}
+# balance: sab classes ko min-length pe cap karo
+m = min(len(v) for v in cls_paths.values())
+items = []
+for ci, c in enumerate(CNN_CLASSES):
+    for p in _balanced_cap(cls_paths[c], m):
+        items.append((p, ci))
+random.shuffle(items)
+print(f"Scan-CNN train: {len(items)} images ({m}/class)")
+
+split = int(len(items) * 0.95)
+tr_ds, va_ds = _ListDS(items[:split]), _ListDS(items[split:])
+tr_dl = _DL(tr_ds, batch_size=64, shuffle=True, num_workers=2, pin_memory=DEVICE.type == "cuda")
+va_dl = _DL(va_ds, batch_size=128, num_workers=2, pin_memory=DEVICE.type == "cuda")
+
+cnn = _TinyCNN().to(DEVICE)
+opt_c = torch.optim.AdamW(cnn.parameters(), lr=1e-3, weight_decay=1e-4)
+crit_c = _nn.CrossEntropyLoss(label_smoothing=0.05)
+for ep in range(1, 7):
+    cnn.train(); tl = tn = corr = 0
+    for xb, yb in tr_dl:
+        xb, yb = xb.to(DEVICE), yb.to(DEVICE)
+        opt_c.zero_grad()
+        out = cnn(xb)
+        loss = crit_c(out, yb)
+        loss.backward()
+        torch.nn.utils.clip_grad_norm_(cnn.parameters(), 1.0)
+        opt_c.step()
+        tl += loss.item() * len(yb); tn += len(yb); corr += (out.argmax(1) == yb).sum().item()
+    cnn.eval(); vc = vn = 0
+    with torch.no_grad():
+        for xb, yb in va_dl:
+            vc += (cnn(xb.to(DEVICE)).argmax(1).cpu() == yb).sum().item(); vn += len(yb)
+    print(f"  cnn epoch {ep}/6 | loss {tl/tn:.4f} | train_acc {corr/tn:.4f} | val_acc {vc/max(vn,1):.4f}")
+
+# export — backend numpy inference (base64 JSON)
+sd = cnn.state_dict()
+doc = {}
+for k, v in sd.items():
+    arr = v.detach().cpu().numpy().astype(np.float32)
+    doc[k] = {"shape": list(arr.shape), "data": _b64.b64encode(arr.tobytes()).decode("ascii")}
+with open(f"{OUT}/modality_cnn.json", "w") as f:
+    json.dump(doc, f)
+print(f"✅ modality_cnn.json saved ({os.path.getsize(f'{OUT}/modality_cnn.json')/1024:.0f} KB) — val_acc {vc/max(vn,1):.4f}")
+del cnn
+torch.cuda.empty_cache() if DEVICE.type == "cuda" else None'''
+
 md_package = r"""## 📦 Ho gaya? Ab files nikalo:
 1. **Save Version** (top-right) → **Save & Run All (Commit)** — ye zaroori hai warna output download nahi hota
 2. Run complete hone ke baad right panel → **Output** → `medai_v2_package.zip` → **⬇ download**
@@ -871,6 +1114,7 @@ cells = [
     {"cell_type": "code", "metadata": {}, "execution_count": None, "outputs": [], "source": code_brain},
     {"cell_type": "code", "metadata": {}, "execution_count": None, "outputs": [], "source": code_kidney},
     {"cell_type": "code", "metadata": {}, "execution_count": None, "outputs": [], "source": code_gate},
+    {"cell_type": "code", "metadata": {}, "execution_count": None, "outputs": [], "source": code_scan_cnn},
     {"cell_type": "code", "metadata": {}, "execution_count": None, "outputs": [], "source": code_onnx},
     {"cell_type": "code", "metadata": {}, "execution_count": None, "outputs": [], "source": code_package},
     {"cell_type": "markdown", "metadata": {}, "source": md_package},
