@@ -9,7 +9,7 @@ import {
 import Navbar from "@/components/Navbar";
 import { EASE } from "@/components/Reveal";
 
-const BACKEND_URL = process.env.NEXT_PUBLIC_BACKEND_URL || "https://fypbackend-8wadjfi2.b4a.run";
+const BACKEND_URL = process.env.NEXT_PUBLIC_BACKEND_URL || "https://fypbackend-m8azn6u3.b4a.run";
 
 interface Metrics {
   available?: boolean;
