@@ -261,7 +261,10 @@ train_tf = transforms.Compose([
     transforms.RandomResizedCrop(224, scale=(0.8, 1.0)),
     transforms.RandomHorizontalFlip(),
     transforms.RandomRotation(7),
-    transforms.ColorJitter(brightness=0.12, contrast=0.12),
+    # v4: STRONG brightness/contrast aug — bright clinic-style stock X-rays
+    # (blue-tint, high-contrast) pe false "Fractured" fix karne ke liye.
+    transforms.ColorJitter(brightness=0.35, contrast=0.30),
+    transforms.RandomAutocontrast(p=0.3),
     transforms.ToTensor(),
     transforms.Normalize(IMAGENET_MEAN, IMAGENET_STD),
 ])
@@ -536,7 +539,9 @@ if MURA_ROOT:
         pos_if_idx = [k for k, v in fr_ifmap.items() if v == 0]
         if neg_if_idx and pos_if_idx:
             neg_paths, pos_paths = [], []
-            CAP_NEG, CAP_POS = 3500, 1200
+            # v4: 3500→9000 negatives — stock-style bright hands (internet images)
+            # ke false positives cover karne ke liye zyada diverse normals chahiye
+            CAP_NEG, CAP_POS = 9000, 1500
             for dp, _, fs in os.walk(mura_train):
                 is_pos = dp.lower().rstrip("/").endswith("_positive")
                 is_neg = dp.lower().rstrip("/").endswith("_negative")
