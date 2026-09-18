@@ -34,7 +34,9 @@ const resultItem: Variants = {
 };
 
 // ── Backend URL from environment variable ──
-const BACKEND_URL = process.env.NEXT_PUBLIC_BACKEND_URL || "https://fypbackend-ditodbpf.b4a.run";
+// Hardcoded (env var override band) — Back4App free URL har redeploy pe badalta
+// hai; naya URL aaye to sirf ye line update karke push karna kaafi hai.
+const BACKEND_URL = "https://fypbackend-ditodbpf.b4a.run";
 
 /** URL query se patient prefill (assistant handoff) + concern note */
 function prefillFromQuery(): { patient: { name: string; age: string; gender: string; phone: string }; concern: string } {

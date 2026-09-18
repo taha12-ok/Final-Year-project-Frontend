@@ -9,7 +9,9 @@ import {
 import Navbar from "@/components/Navbar";
 import { EASE } from "@/components/Reveal";
 
-const BACKEND_URL = process.env.NEXT_PUBLIC_BACKEND_URL || "https://fypbackend-ditodbpf.b4a.run";
+// Hardcoded (env var override band) — Back4App free URL har redeploy pe badalta
+// hai; naya URL aaye to sirf ye line update karke push karna kaafi hai.
+const BACKEND_URL = "https://fypbackend-ditodbpf.b4a.run";
 
 interface Metrics {
   available?: boolean;
