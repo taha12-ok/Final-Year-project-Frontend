@@ -485,6 +485,16 @@ export default function AnalyzePage() {
                 </p>
               </motion.div>
 
+              {/* Scan-type warning (soft — result ke sath hi dikhta hai) */}
+              {result.scan_type_warning && (
+                <motion.div variants={resultItem} style={{ padding: "12px 14px", background: "rgba(245,158,11,0.09)", border: "1.5px solid #f59e0b", borderRadius: 12, marginBottom: 14, display: "flex", gap: 8, alignItems: "flex-start" }}>
+                  <AlertTriangle size={15} style={{ color: "#d97706", flexShrink: 0, marginTop: 2 }} />
+                  <p style={{ color: "#92400e", fontSize: 12.5, lineHeight: 1.6 }}>
+                    <strong>Scan-type check:</strong> {result.scan_type_warning}
+                  </p>
+                </motion.div>
+              )}
+
               {/* Inconclusive warning */}
               {result.reliability?.inconclusive && (
                 <motion.div variants={resultItem} style={{ padding: "12px 14px", background: "rgba(245,158,11,0.09)", border: "1.5px solid #f59e0b", borderRadius: 12, marginBottom: 14, display: "flex", gap: 8, alignItems: "flex-start" }}>
