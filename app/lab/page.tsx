@@ -11,7 +11,7 @@ import { EASE } from "@/components/Reveal";
 
 // Hardcoded (env var override band) — Back4App free URL har redeploy pe badalta
 // hai; naya URL aaye to sirf ye line update karke push karna kaafi hai.
-const BACKEND_URL = "https://fypbackend-tfnzgquc.b4a.run";
+const BACKEND_URL = "https://fypbackend-7u23z8bo.b4a.run";
 
 interface Metrics {
   available?: boolean;
