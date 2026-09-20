@@ -10,7 +10,7 @@ import Navbar from "@/components/Navbar";
 import { EASE } from "@/components/Reveal";
 
 // Hardcoded (env var override band) — Back4App free URL har redeploy pe badalta
-// hai; naya URL aaye to sirf ye line update karke push karna kaafi hai.
+// deployed URL; update this one line when the backend URL changes.
 const BACKEND_URL = "https://fypbackend-gge4skk4.b4a.run";
 
 interface Metrics {
@@ -224,7 +224,7 @@ export default function LabPage() {
           Model <span className="gradient-text">Lab</span>
         </h1>
         <p style={{ color: "var(--muted)", fontSize: 15, marginTop: 8, maxWidth: 560, margin: "8px auto 0" }}>
-          Har model ki honest evaluation — held-out test accuracy, per-class F1, confusion matrix aur calibration.
+          Honest evaluation for every model — held-out test accuracy, per-class F1, confusion matrix, and calibration.
         </p>
         {backendOnline === false && (
           <div style={{ display: "inline-flex", alignItems: "center", gap: 8, marginTop: 16, padding: "9px 16px", background: "rgba(229,72,77,0.08)", border: "1px solid var(--alert)", borderRadius: 100 }}>

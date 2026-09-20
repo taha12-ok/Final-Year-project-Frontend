@@ -35,7 +35,7 @@ const resultItem: Variants = {
 
 // ── Backend URL from environment variable ──
 // Hardcoded (env var override band) — Back4App free URL har redeploy pe badalta
-// hai; naya URL aaye to sirf ye line update karke push karna kaafi hai.
+// deployed URL; update this one line when the backend URL changes.
 const BACKEND_URL = "https://fypbackend-gge4skk4.b4a.run";
 
 /** URL query se patient prefill (assistant handoff) + concern note */
@@ -80,7 +80,7 @@ export default function AnalyzePage() {
     if (c) setConcern(c);
   }, []);
 
-  // ── File set karo ──
+  // ── Set file ──
   const applyFile = (file: File, source: "upload" | "camera") => {
     setImage(file);
     setPreview(URL.createObjectURL(file));
@@ -90,7 +90,7 @@ export default function AnalyzePage() {
     setImageSource(source);
   };
 
-  // ── Testing image use karo ──
+  // ── Use the built-in test image ──
   const useTestImage = async () => {
     try {
       const res  = await fetch(scanInfo.testImage);
@@ -117,11 +117,17 @@ export default function AnalyzePage() {
     const formData = new FormData();
     formData.append("file", image);
     try {
+      const { getToken } = await import("@/lib/api");
       const res  = await fetch(`${BACKEND_URL}/predict/${type}`, {
         method: "POST",
-        headers: { "ngrok-skip-browser-warning": "true" },
+        headers: { "ngrok-skip-browser-warning": "true", ...(getToken() ? { Authorization: `Bearer ${getToken()}` } : {}) },
         body: formData,
       });
+      if (res.status === 401) {
+        const next = encodeURIComponent(`/analyze/${type}`);
+        window.location.href = `/login?next=${next}`;
+        return;
+      }
 
       if (!res.ok) {
         // Structured backend errors (FastAPI detail object ya plain text)
@@ -184,12 +190,19 @@ export default function AnalyzePage() {
     formData.append("gradcam_image", result.gradcam_image || "");
     formData.append("scan_type", scanInfo.scan);
     formData.append("inconclusive", result.reliability?.inconclusive ? "true" : "false");
+    if (result.analysis_id) formData.append("analysis_id", String(result.analysis_id));
     try {
+      const { getToken } = await import("@/lib/api");
       const res  = await fetch(`${BACKEND_URL}/generate-report`, {
         method: "POST",
-        headers: { "ngrok-skip-browser-warning": "true" },
+        headers: { "ngrok-skip-browser-warning": "true", ...(getToken() ? { Authorization: `Bearer ${getToken()}` } : {}) },
         body: formData,
       });
+      if (res.status === 401) {
+        const next = encodeURIComponent(`/analyze/${type}`);
+        window.location.href = `/login?next=${next}`;
+        return;
+      }
       if (!res.ok) throw new Error(`Report failed (${res.status})`);
       const blob = await res.blob();
       const url  = window.URL.createObjectURL(blob);

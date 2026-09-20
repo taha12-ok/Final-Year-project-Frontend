@@ -3,6 +3,7 @@ import { Inter, Space_Grotesk } from "next/font/google";
 import "./globals.css";
 import PageTransition from "@/components/PageTransition";
 import SmoothScroll from "@/components/SmoothScroll";
+import { AuthProvider } from "@/components/Auth";
 
 const grotesk = Space_Grotesk({
   subsets: ["latin"],
@@ -26,8 +27,10 @@ export default function RootLayout({ children }: { children: React.ReactNode }) 
   return (
     <html lang="en" className={`${grotesk.variable} ${inter.variable}`}>
       <body className="antialiased">
-        <SmoothScroll />
-        <PageTransition>{children}</PageTransition>
+        <AuthProvider>
+          <SmoothScroll />
+          <PageTransition>{children}</PageTransition>
+        </AuthProvider>
       </body>
     </html>
   );

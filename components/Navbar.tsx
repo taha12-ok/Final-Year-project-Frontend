@@ -2,7 +2,8 @@
 import { useEffect, useState } from "react";
 import Link from "next/link";
 import { motion } from "framer-motion";
-import { ArrowLeft, Activity } from "lucide-react";
+import { ArrowLeft, Activity, UserRound, LogOut } from "lucide-react";
+import { useAuth } from "@/components/Auth";
 
 interface NavbarProps {
   variant?: "home" | "app";
@@ -45,6 +46,7 @@ const HOME_LINKS = [
  */
 export default function Navbar({ variant = "home", right, onContact }: NavbarProps) {
   const [scrolled, setScrolled] = useState(false);
+  const { user, ready, logout } = useAuth();
 
   useEffect(() => {
     const onScroll = () => setScrolled(window.scrollY > 24);
@@ -84,6 +86,21 @@ export default function Navbar({ variant = "home", right, onContact }: NavbarPro
               >
                 Contact
               </button>
+              {ready && user ? (
+                <>
+                  <Link href="/profile" className="btn btn-secondary" style={{ padding: "9px 16px", fontSize: 13.5, display: "inline-flex", alignItems: "center", gap: 6 }}>
+                    <UserRound size={15} /> {user.full_name?.split(" ")[0] || "Profile"}
+                  </Link>
+                  <button onClick={logout} title="Sign out" className="nav-link"
+                    style={{ background: "none", border: "none", cursor: "pointer", display: "inline-flex", alignItems: "center", gap: 5, fontFamily: "inherit", fontSize: 13.5 }}>
+                    <LogOut size={15} />
+                  </button>
+                </>
+              ) : (
+                <Link href="/login" className="btn btn-secondary" style={{ padding: "9px 16px", fontSize: 13.5 }}>
+                  Sign in
+                </Link>
+              )}
               <Link href="/analyze/fracture" className="btn btn-primary" style={{ padding: "10px 20px", fontSize: 14 }}>
                 Start Analysis
               </Link>
@@ -95,7 +112,14 @@ export default function Navbar({ variant = "home", right, onContact }: NavbarPro
               <ArrowLeft size={17} /> Back to home
             </Link>
             <div className="hidden md:block"><Brand compact /></div>
-            {right}
+            <div style={{ display: "flex", alignItems: "center", gap: 8 }}>
+              {ready && user && (
+                <Link href="/profile" className="btn btn-secondary" style={{ padding: "8px 14px", fontSize: 13, display: "inline-flex", alignItems: "center", gap: 6 }}>
+                  <UserRound size={14} /> Profile
+                </Link>
+              )}
+              {right}
+            </div>
           </>
         )}
       </nav>

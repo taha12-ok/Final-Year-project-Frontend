@@ -20,7 +20,10 @@ ENV PRELOAD_MODELS=1 \
     ORT_THREADS=1 \
     ORT_MEM_ARENA=0 \
     TTA_ENABLED=1 \
-    INCONCLUSIVE_BELOW=60
+    INCONCLUSIVE_BELOW=60 \
+    DATABASE_URL="" \
+    GROQ_API_KEY="" \
+    JWT_SECRET="medai-fyp-secret-change-in-production-2026"
 
 # Back4App/Render dynamic PORT dete hain; local pe 8000 default
 ENV PORT=8000
