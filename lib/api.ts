@@ -8,7 +8,7 @@
 
 export const BACKEND_URL =
   (typeof process !== "undefined" && process.env.NEXT_PUBLIC_BACKEND_URL) ||
-  "https://fypbackend-gge4skk4.b4a.run";
+  "https://fypbackend-7u23z8bo.b4a.run";
 
 const TOKEN_KEY = "medai_token";
 const USER_KEY = "medai_user";
