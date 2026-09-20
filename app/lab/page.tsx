@@ -7,6 +7,7 @@ import {
   ArrowRight, Gauge, ScanEye, ShieldCheck, Layers,
 } from "lucide-react";
 import Navbar from "@/components/Navbar";
+import { useRequireAuth } from "@/components/Auth";
 import { EASE } from "@/components/Reveal";
 
 // Hardcoded (env var override band) — Back4App free URL har redeploy pe badalta
@@ -171,6 +172,8 @@ function ModelCard({ m, metrics, delay }: { m: (typeof MODELS)[0]; metrics: Metr
 }
 
 export default function LabPage() {
+  // ── Auth gate: Model Lab is members-only ──
+  const { user, ready: authReady } = useRequireAuth("/lab");
   const [metrics, setMetrics] = useState<Record<string, Metrics | null>>({ fracture: null, brain: null, kidney: null });
   const [loading, setLoading] = useState(true);
   const [backendOnline, setBackendOnline] = useState<boolean | null>(null);

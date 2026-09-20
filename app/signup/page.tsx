@@ -186,13 +186,13 @@ export default function SignupPage() {
         </div>
         <div style={{ position: "relative", zIndex: 1 }}>
           <motion.h2 initial={{ opacity: 0, y: 20 }} animate={{ opacity: 1, y: 0 }} transition={{ duration: 0.7, ease: EASE }}
-            style={{ fontFamily: "var(--font-display)", fontSize: "clamp(26px, 2.6vw, 38px)", fontWeight: 700, letterSpacing: "-0.02em", lineHeight: 1.2, maxWidth: 460 }}>
+            style={{ fontFamily: "var(--font-display)", fontSize: "clamp(26px, 2.6vw, 38px)", fontWeight: 700, letterSpacing: "-0.02em", lineHeight: 1.2, maxWidth: 460, color: "#ffffff" }}>
             One account.{" "}
             <span style={{ background: "linear-gradient(90deg,#7dd3fc,#a78bfa)", WebkitBackgroundClip: "text", WebkitTextFillColor: "transparent" }}>
               Your entire screening history.
             </span>
           </motion.h2>
-          <p style={{ marginTop: 18, fontSize: 14.5, color: "rgba(255,255,255,0.7)", maxWidth: 440, lineHeight: 1.7 }}>
+          <p style={{ marginTop: 18, fontSize: 14.5, color: "rgba(255,255,255,0.85)", maxWidth: 440, lineHeight: 1.7 }}>
             Every scan you analyze, every PDF you generate, and every detail you share with the AI
             Health Assistant is saved securely to your personal profile — nothing is lost between visits.
           </p>

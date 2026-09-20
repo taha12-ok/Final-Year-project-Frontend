@@ -9,6 +9,7 @@ import {
   Phone, RefreshCw, X, FolderOpen, ArrowRight, ImageOff, Stethoscope,
 } from "lucide-react";
 import Navbar from "@/components/Navbar";
+import { useRequireAuth } from "@/components/Auth";
 import ScanAnimation from "@/components/ScanAnimation";
 import AnimatedCounter from "@/components/AnimatedCounter";
 import Field from "@/components/Field";
@@ -58,6 +59,9 @@ export default function AnalyzePage() {
   const type     = params.type as string;
   const scanInfo = SCAN_TYPES[type] || SCAN_TYPES.fracture;
 
+  // ── Auth gate: screening is members-only — redirect to /login if signed out ──
+  const { user: authUser, ready: authReady } = useRequireAuth(`/analyze/${type}`);
+
   const fileInputRef   = useRef<HTMLInputElement>(null);
   const cameraInputRef = useRef<HTMLInputElement>(null);
 
@@ -79,6 +83,13 @@ export default function AnalyzePage() {
     if (p.name || p.age || p.gender) setPatient((prev) => ({ ...prev, ...p, phone: prev.phone }));
     if (c) setConcern(c);
   }, []);
+
+  // Auto-fill patient name from the signed-in profile
+  useEffect(() => {
+    if (authUser?.full_name) {
+      setPatient((prev) => (prev.name ? prev : { ...prev, name: authUser.full_name }));
+    }
+  }, [authUser]);
 
   // ── Set file ──
   const applyFile = (file: File, source: "upload" | "camera") => {

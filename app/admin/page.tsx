@@ -155,9 +155,9 @@ export default function AdminPage() {
 
           <form onSubmit={login} style={{ display: "flex", flexDirection: "column", gap: 12 }}>
             <input value={username} onChange={(e) => setUsername(e.target.value)} required placeholder="Username"
-              style={{ border: "1px solid var(--border-strong)", borderRadius: 12, padding: "12px 14px", fontSize: 14, background: "var(--bg)", color: "var(--ink)", outline: "none" }} />
+              style={{ border: "1px solid var(--border-strong)", borderRadius: 12, padding: "12px 14px", fontSize: 14, background: "var(--surface)", color: "var(--ink)", outline: "none" }} />
             <input value={password} onChange={(e) => setPassword(e.target.value)} required type="password" placeholder="Password"
-              style={{ border: "1px solid var(--border-strong)", borderRadius: 12, padding: "12px 14px", fontSize: 14, background: "var(--bg)", color: "var(--ink)", outline: "none" }} />
+              style={{ border: "1px solid var(--border-strong)", borderRadius: 12, padding: "12px 14px", fontSize: 14, background: "var(--surface)", color: "var(--ink)", outline: "none" }} />
             {loginErr && (
               <div style={{ background: "rgba(229,72,77,0.08)", border: "1px solid rgba(229,72,77,0.4)", color: "var(--alert)", padding: "10px 13px", borderRadius: 11, fontSize: 13 }}>
                 {loginErr}

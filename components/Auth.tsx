@@ -59,8 +59,8 @@ export function useRequireAuth(nextPath: string) {
   const { user, ready } = useAuth();
   useEffect(() => {
     if (ready && !user) {
-      const next = encodeURIComponent(nextPath || window.location.pathname);
-      window.location.href = `/login?next=${next}`;
+      const next = encodeURIComponent(nextPath || window.location.pathname + window.location.search);
+      window.location.replace(`/login?next=${next}`);
     }
   }, [ready, user, nextPath]);
   return { user, ready };
