@@ -225,7 +225,7 @@ export default function AIDoctorPage() {
                 <Plus size={15} /> New chat
               </button>
               <p style={{ fontSize: 10.5, fontWeight: 800, letterSpacing: "0.12em", color: "var(--muted)", margin: "0 6px 8px" }}>CHAT HISTORY</p>
-              <div style={{ flex: 1, overflowY: "auto", display: "flex", flexDirection: "column", gap: 4 }}>
+              <div style={{ flex: 1, minHeight: 0, overflowY: "auto", display: "flex", flexDirection: "column", gap: 4 }}>
                 {sessions.length === 0 && <p style={{ fontSize: 12.5, color: "var(--muted)", padding: "6px 8px" }}>No conversations yet.</p>}
                 {sessions.map((s) => (
                   <div key={s.id} onClick={() => openSession(s.id)}
@@ -265,7 +265,7 @@ export default function AIDoctorPage() {
           </motion.div>
 
           <div className="panel" style={{ padding: 0, overflow: "hidden", display: "flex", flexDirection: "column", height: "min(66vh, 620px)" }}>
-            <div ref={scrollRef} style={{ flex: 1, overflowY: "auto", padding: "22px 18px", display: "flex", flexDirection: "column", gap: 14 }}>
+            <div ref={scrollRef} style={{ flex: 1, minHeight: 0, overflowY: "auto", padding: "22px 18px", display: "flex", flexDirection: "column", gap: 14 }}>
               {(messages.length ? messages : [GREETING]).map((m, i) => (
                 <motion.div key={i} initial={{ opacity: 0, y: 12, scale: 0.98 }} animate={{ opacity: 1, y: 0, scale: 1 }}
                   transition={{ duration: 0.3, ease: EASE }}
