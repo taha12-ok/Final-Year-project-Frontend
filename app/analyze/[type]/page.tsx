@@ -37,7 +37,7 @@ const resultItem: Variants = {
 // ── Backend URL from environment variable ──
 // Hardcoded (env var override band) — Back4App free URL har redeploy pe badalta
 // deployed URL; update this one line when the backend URL changes.
-const BACKEND_URL = "https://fypbackend-g7kbxory.b4a.run";
+const BACKEND_URL = "https://fypbackend-it3ha90b.b4a.run";
 
 /** URL query se patient prefill (assistant handoff) + concern note */
 function prefillFromQuery(): { patient: { name: string; age: string; gender: string; phone: string }; concern: string } {

@@ -9,7 +9,7 @@
 export const BACKEND_URL =
   // NOTE: hardcoded — Vercel env var (NEXT_PUBLIC_BACKEND_URL) stale Back4App URLs
   // bake kar deta hai, isliye direct literal use karte hain.
-  "https://fypbackend-g7kbxory.b4a.run";
+  "https://fypbackend-it3ha90b.b4a.run";
 const TOKEN_KEY = "medai_token";
 const USER_KEY = "medai_user";
 

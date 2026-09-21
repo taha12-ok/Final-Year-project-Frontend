@@ -136,10 +136,10 @@ export default function AdminPage() {
   // ── Login screen ──
   if (authed === false || authed === null) {
     return (
-      <main style={{ minHeight: "100vh", display: "flex", alignItems: "center", justifyContent: "center", background: "var(--bg)", padding: 20 }}>
+      <main style={{ minHeight: "100vh", display: "flex", alignItems: "center", justifyContent: "center", background: "var(--bg)", padding: 20, position: "relative", overflow: "clip" }}>
         <div className="mesh-bg" />
         <motion.div initial={{ opacity: 0, y: 24 }} animate={{ opacity: 1, y: 0 }} transition={{ duration: 0.6, ease: EASE }}
-          className="panel" style={{ width: "min(400px, 100%)", padding: 30 }}>
+          className="panel" style={{ width: "min(400px, 100%)", padding: 30, position: "relative", zIndex: 1 }}>
           <span style={{
             width: 48, height: 48, borderRadius: 15, background: "linear-gradient(135deg, var(--brand), var(--violet))",
             display: "flex", alignItems: "center", justifyContent: "center", color: "#fff", marginBottom: 16,
