@@ -87,6 +87,7 @@ export default function AIDoctorPage() {
   const [sidebarOpen, setSidebarOpen] = useState(true);
   const [facilities, setFacilities] = useState<any[] | null>(null);
   const [facLoading, setFacLoading] = useState(false);
+  const [facLast, setFacLast] = useState<{ specialty: string; query: string }>({ specialty: "", query: "" });
   const scrollRef = useRef<HTMLDivElement>(null);
 
   const GREETING: Msg = {
@@ -175,6 +176,7 @@ export default function AIDoctorPage() {
   const findFacilities = useCallback(async (specialty: string, query?: string) => {
     setFacLoading(true);
     setFacilities(null);
+    setFacLast({ specialty, query: query || "" });
     try {
       let lat: number, lon: number;
       if (query) {
@@ -320,6 +322,18 @@ export default function AIDoctorPage() {
                             <ArrowRight size={13} style={{ color: "var(--muted)" }} />
                           </a>
                         ))}
+                        {facilities && facilities.length > 0 && (
+                          <Link
+                            href="/find-care"
+                            onClick={() => {
+                              try { sessionStorage.setItem("findcare_prefill", JSON.stringify({ specialty: facLast.specialty, city: facLast.query })); } catch { /* ignore */ }
+                            }}
+                            className="btn btn-secondary"
+                            style={{ width: "100%", padding: "9px 12px", fontSize: 12.5, display: "inline-flex", alignItems: "center", justifyContent: "center", gap: 7, marginTop: 2 }}
+                          >
+                            <MapPin size={13} /> Open in Find Care — live map & directions
+                          </Link>
+                        )}
                       </div>
                     )}
 
