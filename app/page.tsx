@@ -17,7 +17,11 @@ import MagneticButton from "@/components/MagneticButton";
 import AnimatedCounter from "@/components/AnimatedCounter";
 import HeroScan from "@/components/HeroScan";
 import PinnedTeam, { TeamMember } from "@/components/PinnedTeam";
+import dynamic from "next/dynamic";
 import Field from "@/components/Field";
+
+// Leaflet needs window — client-only load, after first paint
+const HomeMap = dynamic(() => import("@/components/HomeMap"), { ssr: false });
 
 /* ════════════════════════════ Data ════════════════════════════ */
 
@@ -145,6 +149,8 @@ export default function LandingPage() {
   const [activeFaq, setActiveFaq] = useState<number | null>(null);
   const [activeModel, setActiveModel] = useState(0);
   const [imgFailed, setImgFailed] = useState<Record<number, boolean>>({});
+  const [mapReady, setMapReady] = useState(false);
+  useEffect(() => { const t = setTimeout(() => setMapReady(true), 1200); return () => clearTimeout(t); }, []);
 
   // ── Pipeline "train" — lock scroll until the line + icons finish playing ──
   const pipelineRef = useRef<HTMLDivElement>(null);
@@ -514,50 +520,25 @@ export default function LandingPage() {
               </div>
             </Reveal>
 
-            {/* Right: animated visual — mock map card + emergency card */}
+            {/* Right: animated visual — real map + emergency card */}
             <Reveal type="slide-right" duration={0.8}>
               <div style={{ display: "flex", flexDirection: "column", gap: 16, height: "100%" }}>
-                {/* Mini animated map mockup */}
+                {/* Real live map — actual Karachi hospitals + animated route */}
                 <motion.div initial={{ opacity: 0, scale: 0.96 }} whileInView={{ opacity: 1, scale: 1 }} viewport={{ once: true }}
                   transition={{ duration: 0.6, ease: EASE }}
-                  className="panel" style={{ flex: 1, minHeight: 260, padding: 0, overflow: "hidden", position: "relative", background: "linear-gradient(140deg, #e8edfb 0%, #dde5f9 50%, #e6e0f7 100%)", boxShadow: "var(--shadow-md)" }}>
-                  {/* fake streets */}
-                  <svg style={{ position: "absolute", inset: 0, width: "100%", height: "100%", opacity: 0.55 }} viewBox="0 0 400 260" preserveAspectRatio="none">
-                    <path d="M-10 60 L410 30" stroke="#ffffff" strokeWidth="9" fill="none" />
-                    <path d="M-10 140 L410 110" stroke="#ffffff" strokeWidth="6" fill="none" />
-                    <path d="M-10 215 L410 185" stroke="#ffffff" strokeWidth="9" fill="none" />
-                    <path d="M70 -10 L95 270" stroke="#ffffff" strokeWidth="7" fill="none" />
-                    <path d="M200 -10 L185 270" stroke="#ffffff" strokeWidth="10" fill="none" />
-                    <path d="M320 -10 L305 270" stroke="#ffffff" strokeWidth="6" fill="none" />
-                    <path d="M200 -10 C 190 90, 240 150, 210 270" stroke="var(--violet)" strokeWidth="4.5" fill="none" strokeDasharray="11 9" strokeLinecap="round" />
-                  </svg>
-                  {/* route dash animation */}
-                  <motion.div initial={{ pathLength: 0 }} whileInView={{ pathLength: 1 }} viewport={{ once: true }}
-                    transition={{ duration: 1.6, ease: EASE, delay: 0.3 }}
-                    style={{ position: "absolute", inset: 0, pointerEvents: "none" }} />
-                  {/* pins */}
-                  {[
-                    { x: "26%", y: "30%", d: 0.5 }, { x: "62%", y: "22%", d: 0.7 },
-                    { x: "40%", y: "62%", d: 0.9 }, { x: "76%", y: "55%", d: 1.1 },
-                  ].map((p, i) => (
-                    <motion.span key={i} initial={{ opacity: 0, y: -14, scale: 0.6 }} whileInView={{ opacity: 1, y: 0, scale: 1 }}
-                      viewport={{ once: true }} transition={{ delay: p.d, duration: 0.45, ease: EASE }}
-                      style={{ position: "absolute", left: p.x, top: p.y, width: 30, height: 30, borderRadius: "50% 50% 50% 4px", transform: "rotate(-45deg)", background: "linear-gradient(135deg, var(--brand), var(--violet))", boxShadow: "0 6px 14px rgba(43,75,223,0.4)", display: "flex", alignItems: "center", justifyContent: "center" }}>
-                      <Hospital size={13} color="#fff" style={{ transform: "rotate(45deg)" }} />
-                    </motion.span>
-                  ))}
-                  {/* you-are-here pulse */}
-                  <motion.span initial={{ scale: 0 }} whileInView={{ scale: 1 }} viewport={{ once: true }} transition={{ delay: 1.2, duration: 0.4, ease: EASE }}
-                    style={{ position: "absolute", left: "55%", top: "72%" }}>
-                    <motion.span animate={{ scale: [1, 1.9], opacity: [0.55, 0] }} transition={{ duration: 1.8, repeat: Infinity, ease: "easeOut" }}
-                      style={{ position: "absolute", left: -14, top: -14, width: 28, height: 28, borderRadius: "50%", background: "var(--brand)" }} />
-                    <span style={{ position: "absolute", left: -7, top: -7, width: 14, height: 14, borderRadius: "50%", background: "var(--brand)", border: "2.5px solid #fff", boxShadow: "0 2px 8px rgba(43,75,223,0.5)" }} />
-                  </motion.span>
+                  className="panel" style={{ flex: 1, minHeight: 320, padding: 0, overflow: "hidden", position: "relative", boxShadow: "var(--shadow-md)" }}>
+                  {mapReady && <HomeMap />}
+                  {/* label chips */}
+                  <motion.div initial={{ opacity: 0, y: 12 }} whileInView={{ opacity: 1, y: 0 }} viewport={{ once: true }} transition={{ delay: 0.9, duration: 0.45, ease: EASE }}
+                    style={{ position: "absolute", left: 14, top: 12, background: "rgba(255,255,255,0.95)", borderRadius: 10, padding: "6px 12px", boxShadow: "0 6px 18px rgba(12,19,56,0.16)", display: "flex", alignItems: "center", gap: 7, pointerEvents: "none" }}>
+                    <span style={{ width: 8, height: 8, borderRadius: "50%", background: "var(--brand)" }} />
+                    <span style={{ fontSize: 11.5, fontWeight: 800, color: "var(--ink)" }}>Real hospitals · Karachi · live map</span>
+                  </motion.div>
                   {/* ETA chip */}
-                  <motion.div initial={{ opacity: 0, y: 12 }} whileInView={{ opacity: 1, y: 0 }} viewport={{ once: true }} transition={{ delay: 1.5, duration: 0.45, ease: EASE }}
-                    style={{ position: "absolute", left: 16, bottom: 14, background: "rgba(255,255,255,0.94)", borderRadius: 12, padding: "9px 14px", boxShadow: "0 8px 22px rgba(12,19,56,0.14)", display: "flex", alignItems: "center", gap: 9 }}>
+                  <motion.div initial={{ opacity: 0, y: 12 }} whileInView={{ opacity: 1, y: 0 }} viewport={{ once: true }} transition={{ delay: 1.2, duration: 0.45, ease: EASE }}
+                    style={{ position: "absolute", left: 14, bottom: 14, background: "rgba(255,255,255,0.95)", borderRadius: 12, padding: "9px 14px", boxShadow: "0 8px 22px rgba(12,19,56,0.14)", display: "flex", alignItems: "center", gap: 9, pointerEvents: "none" }}>
                     <Navigation size={14} style={{ color: "var(--violet)" }} />
-                    <span style={{ fontSize: 12.5, fontWeight: 800, color: "var(--ink)" }}>1.7 km · 3 min</span>
+                    <span style={{ fontSize: 12.5, fontWeight: 800, color: "var(--ink)" }}>Civil Hospital · 1.7 km · 3 min</span>
                   </motion.div>
                 </motion.div>
 

@@ -9,7 +9,7 @@
 export const BACKEND_URL =
   // NOTE: hardcoded — Vercel env var (NEXT_PUBLIC_BACKEND_URL) stale Back4App URLs
   // bake kar deta hai, isliye direct literal use karte hain.
-  "https://fypbackend-vixg2npm.b4a.run";
+  "https://fypbackend-5nk4v9y4.b4a.run";
 const TOKEN_KEY = "medai_token";
 const USER_KEY = "medai_user";
 
@@ -66,6 +66,28 @@ export async function apiFetch(
     }
   }
   return res;
+}
+
+// ── Activity log (har user action backend pe save — ambulance, search, directions) ──
+export interface ActivityItem { id: number; kind: string; detail: string; created_at: string; }
+
+/** Fire-and-forget — logging must never break the actual user action. */
+export async function logActivity(kind: string, detail: string): Promise<void> {
+  try {
+    await apiJson("/activity", {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ kind, detail }),
+      skipAuthRedirect: true,
+    });
+  } catch {
+    /* ignore — best effort */
+  }
+}
+
+export async function getActivity(limit = 50): Promise<ActivityItem[]> {
+  const d = await apiJson<{ activities: ActivityItem[] }>(`/activity/me?limit=${limit}`);
+  return d.activities;
 }
 
 /** JSON helper — throws Error(message) with detail from backend. */

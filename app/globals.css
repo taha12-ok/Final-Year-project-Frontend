@@ -477,3 +477,7 @@ h1, h2, h3, h4 {
 @media (max-width: 900px) {
   .split-grid { grid-template-columns: 1fr !important; }
 }
+
+/* Home Find Care map — animated dashed route + pulse (global: styled-jsx can't scope into SVG paths) */
+.home-route-dash, #find-care path[stroke-dasharray] { animation: homeDashMove 1.6s linear infinite; }
+@keyframes homeDashMove { to { stroke-dashoffset: -19; } }

@@ -8,11 +8,12 @@ import { motion, AnimatePresence } from "framer-motion";
 import Link from "next/link";
 import {
   UserRound, Bone, Brain, Droplets, FileText, Trash2, X, RefreshCw,
-  AlertTriangle, Calendar, BrainCircuit, Plus, ShieldCheck,
+  AlertTriangle, Calendar, BrainCircuit, Plus, ShieldCheck, History,
+  Phone, Search, Navigation, Copy, Ambulance,
 } from "lucide-react";
 import Navbar from "@/components/Navbar";
 import { useRequireAuth } from "@/components/Auth";
-import { apiJson } from "@/lib/api";
+import { apiJson, getActivity, type ActivityItem } from "@/lib/api";
 import { EASE } from "@/components/Reveal";
 
 interface Analysis {
@@ -30,6 +31,16 @@ interface Analysis {
   created_at: string;
 }
 interface MemoryItem { id: number; key: string; value: string; source: string; updated_at: string; }
+
+const ACTIVITY_META: Record<string, { label: string; icon: JSX.Element; color: string }> = {
+  ambulance_call: { label: "Called an ambulance", icon: <Phone size={13} />, color: "#dc2626" },
+  ambulance_copy: { label: "Copied an ambulance number", icon: <Copy size={13} />, color: "#dc2626" },
+  find_care_search: { label: "Searched hospitals", icon: <Search size={13} />, color: "#2b4bdf" },
+  directions: { label: "Got directions", icon: <Navigation size={13} />, color: "#2b4bdf" },
+};
+function activityMeta(kind: string) {
+  return ACTIVITY_META[kind] || { label: kind.replace(/_/g, " "), icon: <History size={13} />, color: "var(--muted)" };
+}
 
 const MODEL_META: Record<string, { label: string; icon: JSX.Element; color: string }> = {
   fracture: { label: "Fracture X-ray", icon: <Bone size={15} />, color: "#2b4bdf" },
@@ -54,9 +65,10 @@ export default function ProfilePage() {
   const [detail, setDetail] = useState<any | null>(null);
   const [thumbCache, setThumbCache] = useState<Record<number, string>>({});
   const [memory, setMemory] = useState<MemoryItem[]>([]);
+  const [activities, setActivities] = useState<ActivityItem[]>([]);
   const [memKey, setMemKey] = useState("");
   const [memVal, setMemVal] = useState("");
-  const [tab, setTab] = useState<"history" | "memory">("history");
+  const [tab, setTab] = useState<"history" | "memory" | "activity">("history");
 
   const load = useCallback(async () => {
     setLoading(true);
@@ -68,6 +80,7 @@ export default function ProfilePage() {
       setTotal(data.total);
       const mem = await apiJson<{ memory: MemoryItem[] }>("/profile/memory");
       setMemory(mem.memory);
+      getActivity(50).then(setActivities).catch(() => { /* ignore */ });
     } catch {
       /* 401 handled globally */
     } finally {
@@ -206,13 +219,13 @@ export default function ProfilePage() {
 
         {/* Tabs */}
         <div style={{ display: "flex", gap: 8, marginTop: 30, marginBottom: 16 }}>
-          {(["history", "memory"] as const).map((t) => (
-            <button key={t} onClick={() => setTab(t)}
-              className={`chip ${tab === t ? "chip-violet" : ""}`}
-              style={{ fontSize: 13, padding: "9px 18px", cursor: "pointer", border: "1px solid var(--border)", background: tab === t ? "var(--violet-soft)" : "var(--surface)", color: tab === t ? "var(--brand-deep)" : "var(--muted)", fontWeight: 700 }}>
-              {t === "history" ? "Screening history" : "Assistant memory"}
-            </button>
-          ))}
+        {(["history", "memory", "activity"] as const).map((t) => (
+          <button key={t} onClick={() => setTab(t)}
+            className={`chip ${tab === t ? "chip-violet" : ""}`}
+            style={{ fontSize: 13, padding: "9px 18px", cursor: "pointer", border: "1px solid var(--border)", background: tab === t ? "var(--violet-soft)" : "var(--surface)", color: tab === t ? "var(--brand-deep)" : "var(--muted)", fontWeight: 700 }}>
+            {t === "history" ? "Screening history" : t === "memory" ? "Assistant memory" : "Recent activity"}
+          </button>
+        ))}
         </div>
 
         {tab === "history" && (
@@ -296,6 +309,49 @@ export default function ProfilePage() {
               </div>
             )}
           </>
+        )}
+
+        {tab === "activity" && (
+          <div className="panel" style={{ padding: 22 }}>
+            <div style={{ display: "flex", alignItems: "center", gap: 9, marginBottom: 6 }}>
+              <History size={17} style={{ color: "var(--brand)" }} />
+              <p style={{ fontWeight: 800, fontFamily: "var(--font-display)", fontSize: 16 }}>Your recent activity</p>
+            </div>
+            <p style={{ fontSize: 13, color: "var(--muted)", marginBottom: 16, lineHeight: 1.6 }}>
+              Everything you do in MedAI — hospital searches, directions, ambulance calls — is saved here and in your admin records.
+            </p>
+            {activities.length === 0 ? (
+              <p style={{ color: "var(--muted)", fontSize: 13.5 }}>
+                No activity yet — search hospitals in Find Care or call an ambulance and it will show up here.
+              </p>
+            ) : (
+              <div>
+                {activities.map((a, i) => {
+                  const meta = activityMeta(a.kind);
+                  return (
+                    <div key={a.id} style={{ display: "flex", gap: 12, alignItems: "flex-start" }}>
+                      {/* timeline rail */}
+                      <div style={{ display: "flex", flexDirection: "column", alignItems: "center", alignSelf: "stretch" }}>
+                        <span style={{
+                          width: 28, height: 28, borderRadius: 10, flexShrink: 0,
+                          display: "flex", alignItems: "center", justifyContent: "center",
+                          background: "var(--bg-alt)", border: "1px solid var(--border)", color: meta.color,
+                        }}>{meta.icon}</span>
+                        {i < activities.length - 1 && <span style={{ width: 2, flex: 1, minHeight: 18, background: "var(--border)" }} />}
+                      </div>
+                      <div style={{ flex: 1, minWidth: 0, paddingBottom: 16 }}>
+                        <p style={{ fontSize: 13.5, fontWeight: 700, color: "var(--ink)", marginTop: 5 }}>{meta.label}</p>
+                        <p style={{ fontSize: 12.5, color: "var(--body)", overflowWrap: "anywhere" }}>{a.detail}</p>
+                        <p style={{ fontSize: 11, color: "var(--muted)", marginTop: 2 }}>
+                          {new Date(a.created_at).toLocaleString()}
+                        </p>
+                      </div>
+                    </div>
+                  );
+                })}
+              </div>
+            )}
+          </div>
         )}
 
         {tab === "memory" && (

@@ -16,7 +16,7 @@ import {
 import Navbar from "@/components/Navbar";
 import SectionHeading from "@/components/SectionHeading";
 import Reveal, { EASE } from "@/components/Reveal";
-import { apiJson } from "@/lib/api";
+import { apiJson, logActivity } from "@/lib/api";
 import { useAuth } from "@/components/Auth";
 import { AMBULANCE_NUMBERS } from "@/lib/emergency";
 import type { Facility, RouteInfo } from "@/components/FindCareMap";
@@ -99,6 +99,7 @@ export default function FindCarePage() {
       setSearched(true);
       setSelected((d.facilities || [])[0] || null);
       if (!d.facilities?.length) setError("No facilities found nearby — try a bigger city name.");
+      else logActivity("find_care_search", `${specialty || "all"} - ${opts?.myLocation ? "my location" : city.trim()} - ${d.facilities.length} results`);
     } catch (e: any) {
       setFacilities([]);
       setSearched(true);
@@ -119,6 +120,7 @@ export default function FindCarePage() {
         `/doctors/directions?lat1=${center.lat}&lon1=${center.lon}&lat2=${selected.lat}&lon2=${selected.lon}`
       );
       setRoute({ coords: d.coords, km: String(d.km), min: d.min });
+      logActivity("directions", `${selected.name} - ${d.km} km - ${d.min} min`);
     } catch {
       setRouteError("Routing service is busy right now — try again in a moment.");
     } finally {
@@ -172,7 +174,12 @@ export default function FindCarePage() {
       await navigator.clipboard.writeText(entry.number);
       setCopied(entry.country);
       setTimeout(() => setCopied(null), 1600);
+      logActivity("ambulance_copy", `${entry.country} ${entry.number}`);
     } catch { /* clipboard unavailable */ }
+  };
+
+  const callAmbulance = (entry: { country: string; number: string }) => {
+    logActivity("ambulance_call", `${entry.country} ${entry.number}`);
   };
 
   // ── Auth gate: signed-out users see nothing but a sign-in prompt ──
@@ -446,6 +453,7 @@ export default function FindCarePage() {
               <div style={{ display: "flex", gap: 8, marginTop: 10 }}>
                 <a
                   href={`tel:${a.number.replace(/\s/g, "")}`}
+                  onClick={() => callAmbulance(a)}
                   className="btn btn-primary"
                   style={{ flex: 1, padding: "8px 10px", fontSize: 12.5, justifyContent: "center", display: "inline-flex", alignItems: "center", gap: 6, textDecoration: "none", background: "linear-gradient(135deg, #dc2626, #b91c1c)", boxShadow: "0 5px 14px rgba(220,38,38,0.3)" }}
                 >
