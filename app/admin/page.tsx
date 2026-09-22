@@ -103,6 +103,7 @@ export default function AdminPage() {
   const [users, setUsers] = useState<UserRow[]>([]);
   const [activities, setActivities] = useState<ActivityRow[]>([]);
   const [loading, setLoading] = useState(false);
+  const [loadError, setLoadError] = useState(false);
 
   // users view state
   const [userQ, setUserQ] = useState("");
@@ -111,16 +112,18 @@ export default function AdminPage() {
 
   const loadAll = useCallback(async () => {
     setLoading(true);
+    setLoadError(false);
     try {
       const o = await adminFetch("/admin/overview");
       if (o.status === 401) { setAuthed(false); return; }
       setOverview(await o.json());
       const [u, a] = await Promise.all([adminFetch("/admin/users"), adminFetch("/admin/activity?limit=200")]);
-      if (u.ok) setUsers((await u.json()).users);
+      if (u.ok) setUsers((await u.json()).users); else setLoadError(true);
       if (a.ok) setActivities((await a.json()).activities);
       setAuthed(true);
     } catch {
       setAuthed(true); // show panel even if backend hiccup
+      setLoadError(true);
     } finally {
       setLoading(false);
     }
@@ -390,7 +393,18 @@ export default function AdminPage() {
                   ))}
                 </div>
 
-                {filteredUsers.length === 0 && (
+                {loadError && users.length === 0 && (
+                  <div style={{ padding: 26, textAlign: "center" }}>
+                    <p style={{ color: "var(--muted)", fontSize: 13.5, margin: "0 0 12px" }}>
+                      Users load nahi ho sake — backend busy ya unreachable hai.
+                    </p>
+                    <button onClick={loadAll} className="btn btn-primary" style={{ padding: "9px 18px", fontSize: 13.5 }}>
+                      ↻ Retry
+                    </button>
+                  </div>
+                )}
+
+                {filteredUsers.length === 0 && !loadError && (
                   <p style={{ padding: 26, textAlign: "center", color: "var(--muted)", fontSize: 13.5 }}>
                     {users.length === 0 ? "No users yet." : "No users match your search."}
                   </p>

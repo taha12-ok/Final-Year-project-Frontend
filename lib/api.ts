@@ -92,7 +92,11 @@ export async function getActivity(limit = 50): Promise<ActivityItem[]> {
 
 /** JSON helper — throws Error(message) with detail from backend. */
 export async function apiJson<T = any>(path: string, opts: RequestInit & { skipAuthRedirect?: boolean } = {}): Promise<T> {
-  const res = await apiFetch(path, opts);
+  const headers = new Headers(opts.headers || {});
+  if (opts.body && typeof opts.body === "string" && !headers.has("Content-Type")) {
+    headers.set("Content-Type", "application/json");
+  }
+  const res = await apiFetch(path, { ...opts, headers });
   const data = await res.json().catch(() => ({}));
   if (!res.ok) {
     const detail = (data as any)?.detail ?? (data as any)?.message;

@@ -21,7 +21,8 @@ import { EASE } from "@/components/Reveal";
 
 interface Handoff { screening: string; name?: string; age?: string; gender?: string; concern?: string }
 interface DoctorFind { specialty: string; query?: string }
-interface Msg { role: "user" | "assistant"; content: string; handoff?: Handoff | null; doctorfind?: DoctorFind | null }
+interface Msg { role: "user" | "assistant"; content: string; handoff?: Handoff | null; doctorfind?: DoctorFind | null; triage?: Triage | null; medicine_answer?: string | null }
+interface Triage { level: "red" | "amber" | "green"; label: string; advice: string }
 interface Session { id: number; title: string; updated_at: string }
 
 const SCREENINGS: Record<string, { href: string; label: string; icon: ReactNode }> = {
@@ -137,7 +138,7 @@ export default function AIDoctorPage() {
     setError(null);
 
     try {
-      const d = await apiJson<{ session_id: number; reply: string; handoff: Handoff | null; doctorfind: DoctorFind | null; memory_saved: string[] }>(
+      const d = await apiJson<{ session_id: number; reply: string; handoff: Handoff | null; doctorfind: DoctorFind | null; memory_saved: string[]; triage: Triage | null; medicine_answer: string | null }>(
         "/chat/send",
         {
           method: "POST",
@@ -148,7 +149,7 @@ export default function AIDoctorPage() {
       setActiveId(d.session_id);
       setMessages((prev) => {
         const next = [...prev];
-        next[next.length - 1] = { role: "assistant", content: d.reply, handoff: d.handoff, doctorfind: d.doctorfind };
+        next[next.length - 1] = { role: "assistant", content: d.reply, handoff: d.handoff, doctorfind: d.doctorfind, triage: d.triage, medicine_answer: d.medicine_answer };
         return next;
       });
       loadSessions();
@@ -302,6 +303,50 @@ export default function AIDoctorPage() {
                             style={{ width: 7, height: 7, borderRadius: "50%", background: "var(--brand)" }} />
                         ))}
                       </div>
+                    )}
+
+                    {/* Triage card (deterministic red/amber/green) */}
+                    {m.triage && (() => {
+                      const T = m.triage;
+                      const tone = T.level === "red"
+                        ? { bg: "rgba(229,72,77,0.08)", bd: "rgba(229,72,77,0.45)", fg: "#b91c1c" }
+                        : T.level === "amber"
+                          ? { bg: "rgba(245,165,36,0.1)", bd: "rgba(245,165,36,0.5)", fg: "#b45309" }
+                          : { bg: "rgba(48,164,108,0.08)", bd: "rgba(48,164,108,0.45)", fg: "#15803d" };
+                      return (
+                        <motion.div initial={{ opacity: 0, y: 8 }} animate={{ opacity: 1, y: 0 }} transition={{ delay: 0.15, duration: 0.35, ease: EASE }}
+                          style={{ marginTop: 14, padding: "13px 15px", borderRadius: 14, background: tone.bg, border: `1.5px solid ${tone.bd}` }}>
+                          <p style={{ fontSize: 11, fontWeight: 800, letterSpacing: "0.1em", color: tone.fg, marginBottom: 4 }}>
+                            {T.level === "red" ? "🚨 EMERGENCY" : T.level === "amber" ? "⚠️ SEE A DOCTOR SOON" : "✓ SELF CARE"}
+                          </p>
+                          <p style={{ fontSize: 13, color: "var(--ink)", lineHeight: 1.55 }}>{T.advice}</p>
+                          {T.level === "red" && (
+                            <a href="tel:1122" className="btn btn-primary"
+                              style={{ marginTop: 10, padding: "9px 16px", fontSize: 13, display: "inline-flex", alignItems: "center", gap: 7, textDecoration: "none" }}>
+                              📞 Call Ambulance 1122
+                            </a>
+                          )}
+                          {T.level === "amber" && (
+                            <Link href="/find-care" className="btn btn-secondary"
+                              style={{ marginTop: 10, padding: "9px 16px", fontSize: 13, display: "inline-flex", alignItems: "center", gap: 7, textDecoration: "none" }}>
+                              <MapPin size={13} /> Find a specialist
+                            </Link>
+                          )}
+                        </motion.div>
+                      );
+                    })()}
+
+                    {/* Medicine schedule answer (deterministic, DB se) */}
+                    {m.medicine_answer && (
+                      <motion.div initial={{ opacity: 0, y: 8 }} animate={{ opacity: 1, y: 0 }} transition={{ delay: 0.15, duration: 0.35, ease: EASE }}
+                        style={{ marginTop: 14, padding: "13px 15px", borderRadius: 14, background: "rgba(124,92,252,0.07)", border: "1.5px solid rgba(124,92,252,0.4)" }}>
+                        <p style={{ fontSize: 11, fontWeight: 800, letterSpacing: "0.1em", color: "var(--violet)", marginBottom: 6 }}>💊 YOUR MEDICINES</p>
+                        <p style={{ fontSize: 13, color: "var(--ink)", lineHeight: 1.6, whiteSpace: "pre-wrap" }}>{m.medicine_answer}</p>
+                        <Link href="/profile" className="btn btn-secondary"
+                          style={{ marginTop: 10, padding: "8px 14px", fontSize: 12.5, display: "inline-flex", alignItems: "center", gap: 7, textDecoration: "none" }}>
+                          Manage medicines & reminders
+                        </Link>
+                      </motion.div>
                     )}
 
                     {/* Doctor finder results */}
