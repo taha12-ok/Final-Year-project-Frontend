@@ -11,7 +11,7 @@ import Link from "next/link";
 import { motion } from "framer-motion";
 import {
   MapPin, Navigation, Search, Phone, Copy, Check, Ambulance, Stethoscope,
-  LocateFixed, ExternalLink, AlertTriangle, Hospital, ShieldCheck,
+  LocateFixed, ExternalLink, AlertTriangle, Hospital, ShieldCheck, ArrowRight,
 } from "lucide-react";
 import Navbar from "@/components/Navbar";
 import SectionHeading from "@/components/SectionHeading";
@@ -175,6 +175,45 @@ export default function FindCarePage() {
     } catch { /* clipboard unavailable */ }
   };
 
+  // ── Auth gate: signed-out users see nothing but a sign-in prompt ──
+  const authLoading = !ready;
+  const signedOut = ready && !user;
+
+  if (authLoading) {
+    return (
+      <main style={{ minHeight: "100vh", display: "flex", alignItems: "center", justifyContent: "center" }}>
+        <Navbar variant="app" />
+        <motion.p animate={{ opacity: [0.4, 1, 0.4] }} transition={{ duration: 1.4, repeat: Infinity }}
+          style={{ color: "var(--muted)", fontSize: 14 }}>Loading…</motion.p>
+      </main>
+    );
+  }
+
+  if (signedOut) {
+    return (
+      <main style={{ minHeight: "100vh", display: "flex", alignItems: "center", justifyContent: "center", padding: 20 }}>
+        <Navbar variant="app" />
+        <motion.div initial={{ opacity: 0, y: 22 }} animate={{ opacity: 1, y: 0 }} transition={{ duration: 0.55, ease: EASE }}
+          className="panel" style={{ maxWidth: 420, width: "100%", padding: "38px 34px", textAlign: "center", borderRadius: 22 }}>
+          <motion.span animate={{ y: [0, -5, 0] }} transition={{ duration: 2.2, repeat: Infinity, ease: "easeInOut" }}
+            style={{ width: 58, height: 58, borderRadius: 18, margin: "0 auto 18px", display: "flex", alignItems: "center", justifyContent: "center", background: "linear-gradient(135deg, var(--brand), var(--violet))", color: "#fff", boxShadow: "0 10px 26px rgba(43,75,223,0.35)" }}>
+            <ShieldCheck size={27} />
+          </motion.span>
+          <h2 style={{ fontFamily: "var(--font-display)", fontSize: 22, fontWeight: 800, marginBottom: 10 }}>Members only</h2>
+          <p style={{ color: "var(--body)", fontSize: 14, lineHeight: 1.7, marginBottom: 24 }}>
+            Find Care — hospital search, live map, directions and the emergency directory — is available to signed-in MedAI members.
+          </p>
+          <Link href="/login?next=/find-care" className="btn btn-primary" style={{ width: "100%", justifyContent: "center", display: "inline-flex", padding: "12px 20px", fontSize: 14.5 }}>
+            Sign in to continue <ArrowRight size={16} />
+          </Link>
+          <p style={{ fontSize: 12.5, color: "var(--muted)", marginTop: 14 }}>
+            New here? <Link href="/signup?next=/find-care" style={{ color: "var(--brand)", fontWeight: 700 }}>Create a free account</Link>
+          </p>
+        </motion.div>
+      </main>
+    );
+  }
+
   return (
     <main style={{ minHeight: "100vh", paddingTop: 96, paddingBottom: 80 }}>
       <Navbar variant="app" />
@@ -241,17 +280,6 @@ export default function FindCarePage() {
                 <Search size={15} /> {loading ? "Searching…" : "Search"}
               </button>
             </div>
-
-            {!ready ? (
-              <p style={{ marginTop: 12, fontSize: 13, color: "var(--muted)" }}>Loading…</p>
-            ) : !user ? (
-              <div style={{ marginTop: 14, display: "flex", alignItems: "center", gap: 9, padding: "11px 14px", borderRadius: 12, background: "rgba(43,75,223,0.07)", border: "1px solid rgba(43,75,223,0.25)" }}>
-                <ShieldCheck size={15} style={{ color: "var(--brand)" }} />
-                <p style={{ fontSize: 13, color: "var(--ink)" }}>
-                  <Link href="/login?next=/find-care" style={{ color: "var(--brand)", fontWeight: 700 }}>Sign in</Link> to search hospitals — emergency numbers below work for everyone.
-                </p>
-              </div>
-            ) : null}
 
             {error && (
               <p style={{ marginTop: 12, fontSize: 13, color: "var(--muted)", display: "flex", alignItems: "center", gap: 7 }}>

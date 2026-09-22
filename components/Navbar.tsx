@@ -36,6 +36,7 @@ export function Brand({ compact = false }: { compact?: boolean }) {
 const HOME_LINKS = [
   { label: "Models", href: "#models" },
   { label: "How it works", href: "#how-it-works" },
+  { label: "Find Care", href: "#find-care" },
   { label: "Team", href: "#team" },
   { label: "FAQ", href: "#faq" },
 ];

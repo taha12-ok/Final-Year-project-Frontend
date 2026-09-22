@@ -7,6 +7,7 @@ import {
   ChevronDown, ArrowRight, ArrowUpRight, Sparkles,
   Bone, Droplets, Upload, UserRound, Bot, Settings,
   Flame, BarChart3, Check, AlertTriangle, Rocket, Mail, Plus,
+  MapPin, Navigation, Ambulance, Hospital,
 } from "lucide-react";
 import Navbar from "@/components/Navbar";
 import Footer from "@/components/Footer";
@@ -472,6 +473,117 @@ export default function LandingPage() {
             </div>
           </Reveal>
         </div>
+      </section>
+
+      {/* ══════════════════ FIND CARE — map + emergency (home showcase) ══════════════════ */}
+      <section id="find-care" style={{ padding: "120px 24px", background: "var(--bg-alt)", position: "relative", overflow: "hidden" }}>
+        <div className="orb orb-drift" style={{ width: 460, height: 460, top: "-12%", right: "-10%", background: "rgba(43,75,223,0.09)" }} />
+        <div style={{ maxWidth: 1180, margin: "0 auto", position: "relative", zIndex: 1 }}>
+          <SectionHeading
+            eyebrow="Find Care"
+            title={<>Hospitals, directions & <span className="gradient-text">emergency numbers</span></>}
+            sub="Search real hospitals by specialty, see them on a live map with driving directions — and one-tap ambulance numbers for 123 countries. All inside MedAI."
+          />
+
+          <div style={{ display: "grid", gridTemplateColumns: "1.1fr 1fr", gap: 22, marginTop: 44, alignItems: "stretch" }} className="split-grid">
+            {/* Left: feature rows + CTA */}
+            <Reveal type="slide-left" duration={0.8} style={{ display: "flex" }}>
+              <div className="panel" style={{ padding: "32px 30px", display: "flex", flexDirection: "column", justifyContent: "center", width: "100%" }}>
+                <span className="eyebrow" style={{ marginBottom: 14, display: "inline-flex", alignItems: "center", gap: 6 }}><MapPin size={13} /> Live directory</span>
+                <h3 style={{ fontFamily: "var(--font-display)", fontSize: 24, fontWeight: 800, marginBottom: 18, letterSpacing: "-0.02em" }}>
+                  From symptom to <span className="gradient-text">the right hospital</span>
+                </h3>
+                {[
+                  { icon: <Stethoscope size={16} />, text: "8 specialties — orthopedic, dentist, cardiologist & more" },
+                  { icon: <MapPin size={16} />, text: "Live map with every hospital pinned nearby" },
+                  { icon: <Navigation size={16} />, text: "Driving directions with distance & travel time" },
+                  { icon: <Ambulance size={16} />, text: "Ambulance numbers for 123 countries — one tap to call" },
+                ].map((r, i) => (
+                  <motion.div key={i} initial={{ opacity: 0, x: -22 }} whileInView={{ opacity: 1, x: 0 }}
+                    viewport={{ once: true }} transition={{ delay: i * 0.09, duration: 0.5, ease: EASE }}
+                    style={{ display: "flex", alignItems: "center", gap: 12, marginBottom: 13 }}>
+                    <span style={{ width: 34, height: 34, borderRadius: 11, background: "linear-gradient(135deg, var(--brand-soft), var(--violet-soft))", color: "var(--brand)", display: "flex", alignItems: "center", justifyContent: "center", flexShrink: 0 }}>{r.icon}</span>
+                    <span style={{ color: "var(--ink)", fontSize: 14.5, fontWeight: 500 }}>{r.text}</span>
+                  </motion.div>
+                ))}
+                <MagneticButton style={{ marginTop: 22, alignSelf: "flex-start" }}>
+                  <Link href="/find-care" className="btn btn-primary">
+                    <MapPin size={16} /> Open Find Care <ArrowRight size={16} />
+                  </Link>
+                </MagneticButton>
+              </div>
+            </Reveal>
+
+            {/* Right: animated visual — mock map card + emergency card */}
+            <Reveal type="slide-right" duration={0.8}>
+              <div style={{ display: "flex", flexDirection: "column", gap: 16, height: "100%" }}>
+                {/* Mini animated map mockup */}
+                <motion.div initial={{ opacity: 0, scale: 0.96 }} whileInView={{ opacity: 1, scale: 1 }} viewport={{ once: true }}
+                  transition={{ duration: 0.6, ease: EASE }}
+                  className="panel" style={{ flex: 1, minHeight: 260, padding: 0, overflow: "hidden", position: "relative", background: "linear-gradient(140deg, #e8edfb 0%, #dde5f9 50%, #e6e0f7 100%)", boxShadow: "var(--shadow-md)" }}>
+                  {/* fake streets */}
+                  <svg style={{ position: "absolute", inset: 0, width: "100%", height: "100%", opacity: 0.55 }} viewBox="0 0 400 260" preserveAspectRatio="none">
+                    <path d="M-10 60 L410 30" stroke="#ffffff" strokeWidth="9" fill="none" />
+                    <path d="M-10 140 L410 110" stroke="#ffffff" strokeWidth="6" fill="none" />
+                    <path d="M-10 215 L410 185" stroke="#ffffff" strokeWidth="9" fill="none" />
+                    <path d="M70 -10 L95 270" stroke="#ffffff" strokeWidth="7" fill="none" />
+                    <path d="M200 -10 L185 270" stroke="#ffffff" strokeWidth="10" fill="none" />
+                    <path d="M320 -10 L305 270" stroke="#ffffff" strokeWidth="6" fill="none" />
+                    <path d="M200 -10 C 190 90, 240 150, 210 270" stroke="var(--violet)" strokeWidth="4.5" fill="none" strokeDasharray="11 9" strokeLinecap="round" />
+                  </svg>
+                  {/* route dash animation */}
+                  <motion.div initial={{ pathLength: 0 }} whileInView={{ pathLength: 1 }} viewport={{ once: true }}
+                    transition={{ duration: 1.6, ease: EASE, delay: 0.3 }}
+                    style={{ position: "absolute", inset: 0, pointerEvents: "none" }} />
+                  {/* pins */}
+                  {[
+                    { x: "26%", y: "30%", d: 0.5 }, { x: "62%", y: "22%", d: 0.7 },
+                    { x: "40%", y: "62%", d: 0.9 }, { x: "76%", y: "55%", d: 1.1 },
+                  ].map((p, i) => (
+                    <motion.span key={i} initial={{ opacity: 0, y: -14, scale: 0.6 }} whileInView={{ opacity: 1, y: 0, scale: 1 }}
+                      viewport={{ once: true }} transition={{ delay: p.d, duration: 0.45, ease: EASE }}
+                      style={{ position: "absolute", left: p.x, top: p.y, width: 30, height: 30, borderRadius: "50% 50% 50% 4px", transform: "rotate(-45deg)", background: "linear-gradient(135deg, var(--brand), var(--violet))", boxShadow: "0 6px 14px rgba(43,75,223,0.4)", display: "flex", alignItems: "center", justifyContent: "center" }}>
+                      <Hospital size={13} color="#fff" style={{ transform: "rotate(45deg)" }} />
+                    </motion.span>
+                  ))}
+                  {/* you-are-here pulse */}
+                  <motion.span initial={{ scale: 0 }} whileInView={{ scale: 1 }} viewport={{ once: true }} transition={{ delay: 1.2, duration: 0.4, ease: EASE }}
+                    style={{ position: "absolute", left: "55%", top: "72%" }}>
+                    <motion.span animate={{ scale: [1, 1.9], opacity: [0.55, 0] }} transition={{ duration: 1.8, repeat: Infinity, ease: "easeOut" }}
+                      style={{ position: "absolute", left: -14, top: -14, width: 28, height: 28, borderRadius: "50%", background: "var(--brand)" }} />
+                    <span style={{ position: "absolute", left: -7, top: -7, width: 14, height: 14, borderRadius: "50%", background: "var(--brand)", border: "2.5px solid #fff", boxShadow: "0 2px 8px rgba(43,75,223,0.5)" }} />
+                  </motion.span>
+                  {/* ETA chip */}
+                  <motion.div initial={{ opacity: 0, y: 12 }} whileInView={{ opacity: 1, y: 0 }} viewport={{ once: true }} transition={{ delay: 1.5, duration: 0.45, ease: EASE }}
+                    style={{ position: "absolute", left: 16, bottom: 14, background: "rgba(255,255,255,0.94)", borderRadius: 12, padding: "9px 14px", boxShadow: "0 8px 22px rgba(12,19,56,0.14)", display: "flex", alignItems: "center", gap: 9 }}>
+                    <Navigation size={14} style={{ color: "var(--violet)" }} />
+                    <span style={{ fontSize: 12.5, fontWeight: 800, color: "var(--ink)" }}>1.7 km · 3 min</span>
+                  </motion.div>
+                </motion.div>
+
+                {/* Emergency mini-card */}
+                <motion.div initial={{ opacity: 0, y: 18 }} whileInView={{ opacity: 1, y: 0 }} viewport={{ once: true }} transition={{ delay: 0.15, duration: 0.5, ease: EASE }}
+                  whileHover={{ y: -3 }}
+                  style={{ borderRadius: 18, padding: "16px 20px", background: "linear-gradient(140deg, rgba(220,38,38,0.12), rgba(220,38,38,0.04))", border: "1px solid rgba(220,38,38,0.28)", display: "flex", alignItems: "center", gap: 14 }}>
+                  <motion.span animate={{ scale: [1, 1.12, 1] }} transition={{ duration: 1.6, repeat: Infinity, ease: "easeInOut" }}
+                    style={{ width: 42, height: 42, borderRadius: 13, background: "linear-gradient(135deg, #dc2626, #b91c1c)", color: "#fff", display: "flex", alignItems: "center", justifyContent: "center", boxShadow: "0 6px 16px rgba(220,38,38,0.35)", flexShrink: 0 }}>
+                    <Ambulance size={20} />
+                  </motion.span>
+                  <div style={{ flex: 1 }}>
+                    <p style={{ fontSize: 13.5, fontWeight: 800, color: "var(--ink)" }}>Emergency? One tap.</p>
+                    <p style={{ fontSize: 12, color: "var(--muted)", marginTop: 2 }}>Ambulance numbers for 123 countries — dial straight from the app.</p>
+                  </div>
+                  <span style={{ fontFamily: "var(--font-display)", fontSize: 22, fontWeight: 800, color: "#dc2626", letterSpacing: "0.02em" }}>1122</span>
+                </motion.div>
+              </div>
+            </Reveal>
+          </div>
+        </div>
+        <style jsx>{`
+          @media (max-width: 900px) {
+            #find-care .split-grid { grid-template-columns: 1fr !important; }
+          }
+        `}</style>
       </section>
 
       {/* ══════════════════ TEAM (scroll-pinned) ══════════════════ */}
