@@ -59,6 +59,7 @@ export default function FindCarePage() {
   // Ambulance state
   const [ambQ, setAmbQ] = useState("");
   const [copied, setCopied] = useState<string | null>(null);
+  const [detectedCountry, setDetectedCountry] = useState<string | null>(null);
 
   const ambList = useMemo(() => {
     const q = ambQ.trim().toLowerCase();
@@ -67,6 +68,15 @@ export default function FindCarePage() {
       (a) => a.country.toLowerCase().includes(q) || a.number.includes(q)
     );
   }, [ambQ]);
+
+  /** Ambulance list ki priority: pehle user ke country ke numbers (detect kiye hue ya search se), baqi neeche. */
+  const sortedAmbList = useMemo(() => {
+    if (!detectedCountry) return ambList;
+    const dc = detectedCountry.toLowerCase();
+    const match = ambList.filter((a) => a.country.toLowerCase().includes(dc));
+    if (!match.length) return ambList;
+    return [...match, ...ambList.filter((a) => !match.includes(a))];
+  }, [ambList, detectedCountry]);
 
   /** Resolve location -> fetch facilities (auth required by backend). */
   const runSearch = useCallback(async (opts?: { myLocation?: boolean }) => {
@@ -83,14 +93,25 @@ export default function FindCarePage() {
         lat = pos.coords.latitude;
         lon = pos.coords.longitude;
         setCenter({ lat, lon });
+        // Location text auto-fill — "Use my location" ke sath field khud bhar jaye
+        apiJson<{ name: string }>(`/doctors/reverse?lat=${lat}&lon=${lon}`)
+          .then((r) => { if (r.name) setCity(r.name); })
+          .catch(() => { /* silent */ });
       } else {
         const q = city.trim();
         if (!q) throw new Error("Type a city first — or use my location.");
-        const g = await apiJson<{ lat: number; lon: number }>(
-          `/doctors/geocode?q=${encodeURIComponent(q)}`
-        );
-        lat = g.lat; lon = g.lon;
-        setCenter({ lat, lon });
+      const g = await apiJson<{ lat: number; lon: number; name?: string }>(
+        `/doctors/geocode?q=${encodeURIComponent(q)}`
+      );
+      lat = g.lat; lon = g.lon;
+      setCenter({ lat, lon });
+      if (g.name && !opts?.myLocation && !city.includes(",")) setCity(g.name.split(",").slice(0, 2).join(", "));
+      if (g.name) {
+        // Country detect karo geocode label se — ambulance list us country ko priority degi
+        const parts = g.name.split(",").map((s: string) => s.trim());
+        const countryGuess = parts[parts.length - 1];
+        if (countryGuess && countryGuess.length > 2) setDetectedCountry(countryGuess);
+      }
       }
       const d = await apiJson<{ facilities: Facility[] }>(
         `/doctors/nearby?lat=${lat}&lon=${lon}&specialty=${encodeURIComponent(specialty)}`
@@ -269,6 +290,10 @@ export default function FindCarePage() {
                   placeholder="Type your city — e.g. Karachi, Lahore, Dubai…"
                   style={{ flex: 1, border: "none", outline: "none", background: "transparent", color: "var(--ink)", fontFamily: "inherit", fontSize: 14 }}
                 />
+                {city && (
+                  <button onClick={() => setCity("")} title="Clear"
+                    style={{ background: "none", border: "none", cursor: "pointer", color: "var(--muted)", fontSize: 15, lineHeight: 1, padding: 0, fontFamily: "inherit" }}>×</button>
+                )}
               </div>
               <button
                 onClick={() => runSearch({ myLocation: true })}
@@ -424,10 +449,19 @@ export default function FindCarePage() {
             />
             <span style={{ fontSize: 12, color: "var(--muted)" }}>{ambList.length} countries</span>
           </div>
+          {detectedCountry && (
+            <div style={{ maxWidth: 480, margin: "12px auto 0", textAlign: "center" }}>
+              <button onClick={() => setDetectedCountry(null)} title="Clear country focus"
+                style={{ display: "inline-flex", alignItems: "center", gap: 7, fontSize: 12.5, fontWeight: 700, cursor: "pointer",
+                  padding: "7px 14px", borderRadius: 999, border: "1px solid rgba(220,38,38,0.35)", background: "rgba(220,38,38,0.08)", color: "#dc2626", fontFamily: "inherit" }}>
+                <Ambulance size={13} /> {detectedCountry} — your location <span style={{ opacity: 0.7 }}>·</span> <span style={{ textDecoration: "underline" }}>clear</span>
+              </button>
+            </div>
+          )}
         </Reveal>
 
         <div style={{ display: "grid", gridTemplateColumns: "repeat(auto-fill, minmax(210px, 1fr))", gap: 12, marginTop: 22 }}>
-          {ambList.map((a, i) => (
+          {sortedAmbList.map((a, i) => (
             <motion.div
               key={a.country}
               initial={{ opacity: 0, y: 14 }}

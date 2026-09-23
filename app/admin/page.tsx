@@ -114,10 +114,14 @@ export default function AdminPage() {
     setLoading(true);
     setLoadError(false);
     try {
-      const o = await adminFetch("/admin/overview");
+      // Teeno requests ek sath (sequential await = total time teeno ka sum hota tha)
+      const [o, u, a] = await Promise.all([
+        adminFetch("/admin/overview"),
+        adminFetch("/admin/users"),
+        adminFetch("/admin/activity?limit=200"),
+      ]);
       if (o.status === 401) { setAuthed(false); return; }
-      setOverview(await o.json());
-      const [u, a] = await Promise.all([adminFetch("/admin/users"), adminFetch("/admin/activity?limit=200")]);
+      if (o.ok) setOverview(await o.json());
       if (u.ok) setUsers((await u.json()).users); else setLoadError(true);
       if (a.ok) setActivities((await a.json()).activities);
       setAuthed(true);

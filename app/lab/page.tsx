@@ -10,9 +10,8 @@ import Navbar from "@/components/Navbar";
 import { useRequireAuth } from "@/components/Auth";
 import { EASE } from "@/components/Reveal";
 
-// Hardcoded (env var override band) — Back4App free URL har redeploy pe badalta
-// deployed URL; update this one line when the backend URL changes.
-const BACKEND_URL = "https://fypbackend-vixg2npm.b4a.run";
+// Backend URL single source of truth: lib/api.ts (URL swap = sirf wahan ek line)
+import { BACKEND_URL } from "@/lib/api";
 
 interface Metrics {
   available?: boolean;

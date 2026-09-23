@@ -10,6 +10,7 @@ import {
 } from "lucide-react";
 import Navbar from "@/components/Navbar";
 import { useRequireAuth } from "@/components/Auth";
+import { BACKEND_URL } from "@/lib/api";
 import ScanAnimation from "@/components/ScanAnimation";
 import AnimatedCounter from "@/components/AnimatedCounter";
 import Field from "@/components/Field";
@@ -33,11 +34,6 @@ const resultItem: Variants = {
   hidden: { opacity: 0, y: 22, scale: 0.99 },
   show: { opacity: 1, y: 0, scale: 1, transition: { duration: 0.45, ease: EASE } },
 };
-
-// ── Backend URL from environment variable ──
-// Hardcoded (env var override band) — Back4App free URL har redeploy pe badalta
-// deployed URL; update this one line when the backend URL changes.
-const BACKEND_URL = "https://fypbackend-vixg2npm.b4a.run";
 
 /** URL query se patient prefill (assistant handoff) + concern note */
 function prefillFromQuery(): { patient: { name: string; age: string; gender: string; phone: string }; concern: string } {

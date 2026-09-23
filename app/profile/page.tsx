@@ -31,7 +31,7 @@ interface Analysis {
   created_at: string;
 }
 interface MemoryItem { id: number; key: string; value: string; source: string; updated_at: string; }
-interface MedItem { id: number; name: string; dose: string; times: string[]; }
+interface MedItem { id: number; name: string; dose: string; times: string[]; recipient_email?: string; }
 interface TodayItem { medicine_id: number; name: string; dose: string; slot: string; day: string; status: string; }
 interface TodayData { day: string; items: TodayItem[]; taken: number; missed: number; total: number; }
 interface MedStats { adherence_pct: number | null; streak_days: number; week: { day: string; taken: number; missed: number; pending: number; ratio: number | null }[]; }
@@ -86,6 +86,8 @@ export default function ProfilePage() {
   const [medName, setMedName] = useState("");
   const [medDose, setMedDose] = useState("");
   const [medTimes, setMedTimes] = useState("");
+  const [medEmail, setMedEmail] = useState("");
+  const [remEmail, setRemEmail] = useState("");
   const [medBusy, setMedBusy] = useState(false);
   const [detailView, setDetailView] = useState<"original" | "focus">("original");
 
@@ -114,15 +116,16 @@ export default function ProfilePage() {
   const loadMeds = useCallback(async () => {
     try {
       const [m, t, s, st] = await Promise.all([
-        apiJson<{ medicines: MedItem[] }>("/medicines"),
+        apiJson<{ medicines: MedItem[]; reminder_email?: string }>("/medicines"),
         apiJson<TodayData>("/medicines/today"),
         apiJson<MedStats>("/medicines/stats"),
-        apiJson<{ email_reminders: boolean }>("/settings/me"),
+        apiJson<{ email_reminders: boolean; reminder_email?: string }>("/settings/me"),
       ]);
       setMeds(m.medicines);
       setToday(t);
       setMedStats(s);
       setEmailRem(st.email_reminders);
+      setRemEmail(st.reminder_email || m.reminder_email || "");
     } catch { /* 401 handled globally */ }
   }, []);
 
@@ -145,8 +148,8 @@ export default function ProfilePage() {
     setMedBusy(true);
     try {
       const times = medTimes.split(",").map((x) => x.trim()).filter(Boolean);
-      await apiJson("/medicines", { method: "POST", body: JSON.stringify({ name: medName, dose: medDose, times: times.length ? times : ["09:00"] }) });
-      setMedName(""); setMedDose(""); setMedTimes("");
+      await apiJson("/medicines", { method: "POST", body: JSON.stringify({ name: medName, dose: medDose, times: times.length ? times : ["09:00"], recipient_email: medEmail.trim() }) });
+      setMedName(""); setMedDose(""); setMedTimes(""); setMedEmail("");
       await loadMeds();
       getActivity(50).then(setActivities).catch(() => {});
     } catch { /* ignore */ } finally { setMedBusy(false); }
@@ -163,8 +166,16 @@ export default function ProfilePage() {
 
   const toggleEmail = async () => {
     try {
-      const r = await apiJson<{ email_reminders: boolean }>("/settings/me", { method: "POST", body: JSON.stringify({ email_reminders: !emailRem }) });
+      const r = await apiJson<{ email_reminders: boolean; reminder_email?: string }>("/settings/me", { method: "POST", body: JSON.stringify({ email_reminders: !emailRem, reminder_email: remEmail.trim() }) });
       setEmailRem(r.email_reminders);
+      if (r.reminder_email !== undefined) setRemEmail(r.reminder_email);
+    } catch { /* ignore */ }
+  };
+
+  const saveRemEmail = async () => {
+    try {
+      const r = await apiJson<{ email_reminders: boolean; reminder_email?: string }>("/settings/me", { method: "POST", body: JSON.stringify({ email_reminders: emailRem, reminder_email: remEmail.trim() }) });
+      setRemEmail(r.reminder_email || "");
     } catch { /* ignore */ }
   };
 
@@ -295,14 +306,19 @@ export default function ProfilePage() {
         </div>
 
         {/* Tabs */}
-        <div style={{ display: "flex", gap: 8, marginTop: 30, marginBottom: 16 }}>
-        {(["history", "medicines", "memory", "activity"] as const).map((t) => (
+        <div style={{ display: "flex", gap: 8, marginTop: 30, marginBottom: 16, flexWrap: "wrap" }}>
+        {(["history", "memory", "activity"] as const).map((t) => (
           <button key={t} onClick={() => setTab(t)}
             className={`chip ${tab === t ? "chip-violet" : ""}`}
             style={{ fontSize: 13, padding: "9px 18px", cursor: "pointer", border: "1px solid var(--border)", background: tab === t ? "var(--violet-soft)" : "var(--surface)", color: tab === t ? "var(--brand-deep)" : "var(--muted)", fontWeight: 700 }}>
-            {t === "history" ? "Screening history" : t === "medicines" ? "Medicines" : t === "memory" ? "Assistant memory" : "Recent activity"}
+            {t === "history" ? "Screening history" : t === "memory" ? "Assistant memory" : "Recent activity"}
           </button>
         ))}
+        {/* Medicines ab dedicated page par hai */}
+        <Link href="/medicines" className="btn btn-secondary"
+          style={{ fontSize: 13, padding: "9px 18px", display: "inline-flex", alignItems: "center", gap: 7, borderRadius: 999 }}>
+          <Pill size={14} /> Medicines & reminders
+        </Link>
         </div>
 
         {tab === "history" && (
@@ -480,9 +496,21 @@ export default function ProfilePage() {
                 style={{ flex: "0 1 130px", border: "1px solid var(--border-strong)", borderRadius: 11, padding: "10px 13px", fontSize: 13.5, background: "var(--bg)", color: "var(--ink)", outline: "none" }} />
               <input value={medTimes} onChange={(e) => setMedTimes(e.target.value)} placeholder="Times (09:00, 21:00)"
                 style={{ flex: "1 1 170px", border: "1px solid var(--border-strong)", borderRadius: 11, padding: "10px 13px", fontSize: 13.5, background: "var(--bg)", color: "var(--ink)", outline: "none" }} />
+              <input value={medEmail} onChange={(e) => setMedEmail(e.target.value)} placeholder="Reminder email (optional — account email)"
+                style={{ flex: "1 1 220px", border: "1px solid var(--border-strong)", borderRadius: 11, padding: "10px 13px", fontSize: 13.5, background: "var(--bg)", color: "var(--ink)", outline: "none" }} />
               <button onClick={addMed} disabled={medBusy || !medName.trim()} className="btn btn-primary"
                 style={{ padding: "10px 16px", fontSize: 13, display: "inline-flex", alignItems: "center", gap: 6, opacity: medBusy || !medName.trim() ? 0.6 : 1 }}>
                 <Plus size={14} /> Add medicine
+              </button>
+            </div>
+
+            {/* reminder email override */}
+            <div style={{ display: "flex", gap: 8, alignItems: "center", marginBottom: 18, flexWrap: "wrap" }}>
+              <input value={remEmail} onChange={(e) => setRemEmail(e.target.value)} placeholder="Default reminder email (khaali = account email)"
+                style={{ flex: "1 1 240px", border: "1px solid var(--border-strong)", borderRadius: 11, padding: "10px 13px", fontSize: 13.5, background: "var(--bg)", color: "var(--ink)", outline: "none" }} />
+              <button onClick={saveRemEmail} disabled={medBusy}
+                style={{ padding: "10px 16px", fontSize: 13, borderRadius: 10, border: "1px solid var(--border-strong)", background: "var(--surface)", color: "var(--ink)", cursor: "pointer", fontWeight: 700 }}>
+                Save
               </button>
             </div>
 
@@ -547,7 +575,7 @@ export default function ProfilePage() {
                   <div key={m.id} style={{ display: "flex", alignItems: "center", gap: 8, border: "1px solid var(--border)", borderRadius: 12, padding: "10px 13px", background: "var(--bg-alt)" }}>
                     <div style={{ flex: 1, minWidth: 0 }}>
                       <p style={{ fontSize: 13.5, fontWeight: 700 }}>{m.name} {m.dose && <span style={{ color: "var(--muted)", fontWeight: 500, fontSize: 12 }}>· {m.dose}</span>}</p>
-                      <p style={{ fontSize: 12, color: "var(--muted)" }}>{m.times.join(", ")}</p>
+                      <p style={{ fontSize: 12, color: "var(--muted)" }}>{m.times.join(", ")}{m.recipient_email ? ` · 📧 ${m.recipient_email}` : ""}</p>
                     </div>
                     <button onClick={() => stopMed(m.id)} title="Stop medicine" style={{ background: "none", border: "none", cursor: "pointer", color: "var(--muted)" }}>
                       <Trash2 size={14} />

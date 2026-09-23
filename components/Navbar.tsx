@@ -2,7 +2,7 @@
 import { useEffect, useState } from "react";
 import Link from "next/link";
 import { motion } from "framer-motion";
-import { ArrowLeft, Activity, UserRound, LogOut, MapPin } from "lucide-react";
+import { ArrowLeft, Activity, UserRound, LogOut, MapPin, Pill } from "lucide-react";
 import { useAuth } from "@/components/Auth";
 
 interface NavbarProps {
@@ -118,6 +118,9 @@ export default function Navbar({ variant = "home", right, onContact }: NavbarPro
                 <>
                   <Link href="/find-care" className="btn btn-secondary" style={{ padding: "8px 14px", fontSize: 13, display: "inline-flex", alignItems: "center", gap: 6 }}>
                     <MapPin size={14} /> Find Care
+                  </Link>
+                  <Link href="/medicines" className="btn btn-secondary" style={{ padding: "8px 14px", fontSize: 13, display: "inline-flex", alignItems: "center", gap: 6 }}>
+                    <Pill size={14} /> Medicines
                   </Link>
                   <Link href="/profile" className="btn btn-secondary" style={{ padding: "8px 14px", fontSize: 13, display: "inline-flex", alignItems: "center", gap: 6 }}>
                     <UserRound size={14} /> Profile
